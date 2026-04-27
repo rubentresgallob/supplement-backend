@@ -1,0 +1,104 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model user {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique
+  password   String
+  username   String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user_supplements      user_supplement[]
+  intakes               intake[]
+  friendships_requested friendship[]          @relation("Requester")
+  friendships_received  friendship[]          @relation("Receiver")
+  notification_config   notification_config?
+}
+
+model supplement_database {
+  id             Int      @id @default(autoincrement())
+  name           String
+  category       String
+  forms          String[]
+  typical_dosage String
+  functions      String[]
+  benefits       String[]
+  notes          String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  user_supplements user_supplement[]
+}
+
+model user_supplement {
+  id                     Int      @id @default(autoincrement())
+  user_id                Int
+  supplement_database_id Int?
+  custom_name            String?
+  form                   String
+  dosage_amount          Float
+  dosage_unit            String
+  times_per_day          Int
+  schedules              String[] // Array of time strings like ["08:00", "14:00", "20:00"]
+  active                 Boolean  @default(true)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  user                user                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  supplement_database supplement_database? @relation(fields: [supplement_database_id], references: [id])
+  intakes             intake[]
+
+  @@index([user_id])
+  @@index([supplement_database_id])
+}
+
+model intake {
+  id                 Int      @id @default(autoincrement())
+  user_id            Int
+  user_supplement_id Int
+  taken_at           DateTime @default(now())
+  created_at         DateTime @default(now())
+
+  user            user            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_supplement user_supplement @relation(fields: [user_supplement_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([user_supplement_id])
+  @@index([taken_at])
+}
+
+model friendship {
+  id           Int      @id @default(autoincrement())
+  requester_id Int
+  receiver_id  Int
+  status       String   @default("pending") // pending, accepted, rejected
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  requester user @relation("Requester", fields: [requester_id], references: [id], onDelete: Cascade)
+  receiver  user @relation("Receiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@unique([requester_id, receiver_id])
+  @@index([requester_id])
+  @@index([receiver_id])
+  @@index([status])
+}
+
+model notification_config {
+  id                 Int      @id @default(autoincrement())
+  user_id            Int      @unique
+  global_enabled     Boolean  @default(true)
+  supplement_configs String   @default("[]") // JSON string with array of configs
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}

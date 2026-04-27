@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Tomas</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <button onclick="window.location.href='/dashboard.html'" class="btn-icon">←</button>
+            <h1>Historial</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <!-- Date Filter -->
+        <div class="date-filter">
+            <button onclick="changeDate(-1)" class="btn-icon">◀</button>
+            <span id="currentDate" class="date-display">Hoy</span>
+            <button onclick="changeDate(1)" class="btn-icon">▶</button>
+        </div>
+
+        <!-- History List -->
+        <div id="historyList" class="history-list">
+            <div class="loading">Cargando historial...</div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyHistory" class="empty-state" style="display: none;">
+            <div class="empty-icon">📅</div>
+            <h3>Sin tomas registradas</h3>
+            <p>No hay tomas registradas para esta fecha</p>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="bottom-nav">
+            <a href="/dashboard.html" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Inicio</span>
+            </a>
+            <a href="/catalog.html" class="nav-item">
+                <span class="nav-icon">📚</span>
+                <span class="nav-label">Catálogo</span>
+            </a>
+            <a href="/history.html" class="nav-item active">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Historial</span>
+            </a>
+            <a href="/profile.html" class="nav-item">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">Perfil</span>
+            </a>
+        </nav>
+    </div>
+    <script src="/js/api.js"></script>
+    <script src="/js/history.js"></script>
+</body>
+</html>

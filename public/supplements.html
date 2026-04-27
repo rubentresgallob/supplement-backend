@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Añadir Suplemento</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <button onclick="window.location.href='/dashboard.html'" class="btn-icon">←</button>
+            <h1>Añadir Suplemento</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <!-- Add Form -->
+        <div class="form-container">
+            <form onsubmit="handleAddSupplement(event)">
+                <div class="form-group">
+                    <label>Seleccionar del Catálogo</label>
+                    <select id="catalogSelect" onchange="handleCatalogSelect()">
+                        <option value="">-- Seleccionar --</option>
+                    </select>
+                </div>
+
+                <div class="divider">
+                    <span>o crear uno personalizado</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Nombre *</label>
+                    <input type="text" id="supplementName" placeholder="Ej: Vitamina D" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Categoría</label>
+                    <select id="supplementCategory">
+                        <option value="vitamins">Vitaminas</option>
+                        <option value="minerals">Minerales</option>
+                        <option value="protein">Proteínas</option>
+                        <option value="other">Otros</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Dosis Diaria</label>
+                    <input type="text" id="supplementDosage" placeholder="Ej: 1 cápsula / 5000 UI">
+                </div>
+
+                <div class="form-group">
+                    <label>Frecuencia Diaria *</label>
+                    <input type="number" id="supplementFrequency" value="1" min="1" max="10" required>
+                    <small>Número de tomas al día</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Horarios (opcional)</label>
+                    <div id="scheduleInputs">
+                        <input type="time" class="schedule-time" placeholder="09:00">
+                    </div>
+                    <button type="button" onclick="addScheduleInput()" class="btn btn-outline btn-sm">➕ Añadir horario</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Notas</label>
+                    <textarea id="supplementNotes" placeholder="Ej: Tomar con comida" rows="3"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Añadir Suplemento</button>
+                <div id="addError" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+    <script src="/js/api.js"></script>
+    <script src="/js/supplements.js"></script>
+</body>
+</html>

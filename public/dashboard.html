@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Suplementos</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>💊 Mis Suplementos</h1>
+            <button onclick="logout()" class="btn-icon">🚪</button>
+        </header>
+
+        <!-- User Stats -->
+        <div class="stats-card">
+            <div class="stat-item">
+                <div class="stat-value" id="todayIntakes">0/0</div>
+                <div class="stat-label">Hoy</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="currentStreak">0 🔥</div>
+                <div class="stat-label">Racha</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="adherence">0%</div>
+                <div class="stat-label">Adherencia</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <button onclick="window.location.href='/supplements.html'" class="btn btn-secondary">
+                ➕ Añadir Suplemento
+            </button>
+            <button onclick="window.location.href='/catalog.html'" class="btn btn-outline">
+                📚 Catálogo
+            </button>
+        </div>
+
+        <!-- Supplements List -->
+        <div id="supplementsList" class="supplements-list">
+            <div class="loading">Cargando tus suplementos...</div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-icon">📦</div>
+            <h3>No tienes suplementos</h3>
+            <p>Añade tu primer suplemento desde el catálogo</p>
+            <button onclick="window.location.href='/catalog.html'" class="btn btn-primary">
+                Ver Catálogo
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="bottom-nav">
+            <a href="/dashboard.html" class="nav-item active">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Inicio</span>
+            </a>
+            <a href="/catalog.html" class="nav-item">
+                <span class="nav-icon">📚</span>
+                <span class="nav-label">Catálogo</span>
+            </a>
+            <a href="/history.html" class="nav-item">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Historial</span>
+            </a>
+            <a href="/profile.html" class="nav-item">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">Perfil</span>
+            </a>
+        </nav>
+    </div>
+    <script src="/js/api.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

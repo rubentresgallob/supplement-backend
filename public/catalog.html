@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Suplementos</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <button onclick="window.location.href='/dashboard.html'" class="btn-icon">←</button>
+            <h1>Catálogo</h1>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Buscar suplementos..." onkeyup="filterSupplements()">
+        </div>
+
+        <!-- Categories -->
+        <div class="categories">
+            <button class="category-chip active" data-category="all" onclick="filterByCategory('all')">Todos</button>
+            <button class="category-chip" data-category="vitamins" onclick="filterByCategory('vitamins')">Vitaminas</button>
+            <button class="category-chip" data-category="minerals" onclick="filterByCategory('minerals')">Minerales</button>
+            <button class="category-chip" data-category="protein" onclick="filterByCategory('protein')">Proteínas</button>
+            <button class="category-chip" data-category="other" onclick="filterByCategory('other')">Otros</button>
+        </div>
+
+        <!-- Supplements Catalog -->
+        <div id="catalogList" class="catalog-list">
+            <div class="loading">Cargando catálogo...</div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="bottom-nav">
+            <a href="/dashboard.html" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Inicio</span>
+            </a>
+            <a href="/catalog.html" class="nav-item active">
+                <span class="nav-icon">📚</span>
+                <span class="nav-label">Catálogo</span>
+            </a>
+            <a href="/history.html" class="nav-item">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Historial</span>
+            </a>
+            <a href="/profile.html" class="nav-item">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">Perfil</span>
+            </a>
+        </nav>
+    </div>
+    <script src="/js/api.js"></script>
+    <script src="/js/catalog.js"></script>
+</body>
+</html>
