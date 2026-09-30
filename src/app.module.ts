@@ -11,10 +11,11 @@ import { StreaksModule } from './streaks/streaks.module';
 import { FriendsModule } from './friends/friends.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { PrismaService } from './prisma/prisma.service';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
+    PrismaModule,
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 60,
@@ -31,7 +32,6 @@ import { PrismaService } from './prisma/prisma.service';
   controllers: [AppController],
   providers: [
     AppService,
-    PrismaService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
