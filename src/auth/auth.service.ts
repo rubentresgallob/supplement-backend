@@ -60,6 +60,7 @@ export class AuthService {
         email,
         password: hashedPassword,
         username,
+        consent_at: registerDto.acceptTerms ? new Date() : null,
       },
     });
 

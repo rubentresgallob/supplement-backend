@@ -1,5 +1,5 @@
-import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsBoolean } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
   @ApiProperty({ example: 'user@example.com', description: 'User email' })
@@ -16,4 +16,12 @@ export class RegisterDto {
   @MinLength(3, { message: 'Username must be at least 3 characters long' })
   @MaxLength(30, { message: 'Username must not exceed 30 characters' })
   username: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Acepta términos, privacidad y el tratamiento de sus datos de salud (RGPD)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  acceptTerms?: boolean;
 }

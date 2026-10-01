@@ -19,6 +19,7 @@ model user {
   reset_code_hash String? // Recuperar contraseña: código de 6 cifras (hasheado)
   reset_expires   DateTime?
   reset_attempts  Int       @default(0)
+  consent_at      DateTime? // RGPD: cuándo aceptó términos, privacidad y el tratamiento de datos de salud
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
