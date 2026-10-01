@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eliminar cuenta - Suplementos Tracker</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .warning { background: #fff4e5; color: #8a4b00; padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.45; margin-bottom: 16px; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .result { margin-top: 16px; font-size: 15px; text-align: center; }
+        .result.ok { color: #15803d; }
+        .result.err { color: #b91c1c; }
+        ul { margin: 8px 0 0 18px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="auth-container">
+            <div class="logo">
+                <div class="logo-icon">💊</div>
+                <h1>Suplementos Tracker</h1>
+                <p class="subtitle">Eliminar mi cuenta</p>
+            </div>
+
+            <div class="auth-form">
+                <div class="warning">
+                    <strong>Esta acción no se puede deshacer.</strong> Se borrarán para siempre:
+                    <ul>
+                        <li>Tu cuenta y tu perfil</li>
+                        <li>Tus suplementos, tomas, rachas y estadísticas</li>
+                        <li>Tus amigos, puntos y objetos de la tienda</li>
+                    </ul>
+                    <p style="margin-top:8px">Si tienes una suscripción Pro, cancélala también desde la App Store o Google Play: borrar la cuenta no la cancela.</p>
+                </div>
+
+                <form id="deleteForm">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" placeholder="tu@email.com" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Contraseña</label>
+                        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="confirm" required> Entiendo que se borrarán todos mis datos</label>
+                    </div>
+                    <button type="submit" class="btn btn-danger" id="submitBtn">Eliminar mi cuenta</button>
+                </form>
+                <p id="result" class="result" role="status"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('deleteForm');
+        const result = document.getElementById('result');
+        const btn = document.getElementById('submitBtn');
+
+        function show(text, ok) {
+            result.textContent = text;
+            result.className = 'result ' + (ok ? 'ok' : 'err');
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            btn.disabled = true;
+            show('Eliminando...', true);
+            try {
+                const login = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+                if (!login.ok) throw new Error('Email o contraseña incorrectos.');
+                const { access_token } = await login.json();
+
+                const del = await fetch('/auth/delete-account', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: 'Bearer ' + access_token,
+                    },
+                    body: JSON.stringify({ password }),
+                });
+                if (!del.ok) throw new Error('No se pudo eliminar la cuenta. Inténtalo más tarde.');
+                form.remove();
+                show('✅ Tu cuenta y todos tus datos se han eliminado.', true);
+            } catch (err) {
+                show(err.message, false);
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

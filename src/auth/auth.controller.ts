@@ -12,6 +12,7 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -55,5 +56,18 @@ export class AuthController {
   async getProfile(@Request() req) {
     this.logger.log(`Profile request for user ID: ${req.user.id}`);
     return this.authService.getProfile(req.user.id);
+  }
+
+  @Post('delete-account')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Eliminar la cuenta y TODOS sus datos (exigido por Apple y Google)',
+  })
+  @ApiResponse({ status: 200, description: 'Cuenta eliminada' })
+  @ApiResponse({ status: 400, description: 'Contraseña incorrecta' })
+  async deleteAccount(@Request() req, @Body() dto: DeleteAccountDto) {
+    return this.authService.deleteAccount(req.user.id, dto.password);
   }
 }

@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -113,6 +114,21 @@ export class AuthService {
         created_at: user.created_at,
       },
     };
+  }
+
+  /**
+   * Borra el usuario. Todo lo demás (suplementos, tomas, amigos, puntos,
+   * objetos...) se borra en cascada desde la base de datos.
+   */
+  async deleteAccount(userId: number, password: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      // 400 y no 401: la app trata los 401 como "sesión caducada"
+      throw new BadRequestException('Contraseña incorrecta');
+    }
+    await this.prisma.user.delete({ where: { id: userId } });
+    this.logger.log(`Cuenta eliminada: usuario ${userId}`);
+    return { message: 'Cuenta eliminada' };
   }
 
   async getProfile(userId: number) {
