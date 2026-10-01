@@ -9,15 +9,21 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Serve static files from public directory
-  app.useStaticAssets(join(__dirname, '..', 'public'));
+  // Demo web (carpeta public/ en la raíz del proyecto, tanto en local como en Render)
+  app.useStaticAssets(join(process.cwd(), 'public'));
 
+  // La app móvil no necesita CORS; esto es solo para webs en otros dominios.
+  // Orígenes extra separados por comas en la variable CORS_ORIGINS.
+  const extraOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
     origin: [
-      'https://mysupple.abacusai.app',
       'http://radiant-bunny-ee1134.netlify.app',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      ...extraOrigins,
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],

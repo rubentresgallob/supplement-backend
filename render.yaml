@@ -1,0 +1,26 @@
+# Despliegue en Render (https://render.com) — plan gratuito.
+# Render lee este archivo al crear un "Blueprint" desde el repo de GitHub
+# y vuelve a desplegar solo en cada push a main.
+services:
+  - type: web
+    name: supplement-backend
+    runtime: node
+    plan: free
+    region: frankfurt # cerca de España y de la BD de Supabase (París)
+    branch: main
+    # --include=dev: el build necesita el CLI de Nest (devDependencies)
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Se pega a mano en el panel de Render (la misma URL de Supabase del .env)
+      - key: DATABASE_URL
+        sync: false
+      # Render genera una clave nueva y segura
+      - key: JWT_SECRET
+        generateValue: true
