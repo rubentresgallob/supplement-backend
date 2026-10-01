@@ -7,12 +7,16 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateIntakeDto } from './dto/create-intake.dto';
 import { startOfDay, endOfDay } from 'date-fns';
+import { RewardsService, GrantedReward } from '../rewards/rewards.service';
 
 @Injectable()
 export class IntakesService {
   private readonly logger = new Logger(IntakesService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private rewardsService: RewardsService,
+  ) {}
 
   async create(userId: number, dto: CreateIntakeDto) {
     // Verify the user supplement exists and belongs to the user
@@ -54,7 +58,16 @@ export class IntakesService {
     this.logger.log(
       `Intake recorded: ${intake.id} for user ${userId}, supplement ${dto.userSupplementId}`,
     );
-    return intake;
+
+    // Premios ganados con esta toma (día completo, logros...). Si falla, la toma ya está guardada.
+    let rewards: GrantedReward[] = [];
+    try {
+      rewards = (await this.rewardsService.sync(userId)).granted;
+    } catch (error) {
+      this.logger.error(`Error al calcular premios del usuario ${userId}`, error);
+    }
+
+    return { ...intake, rewards };
   }
 
   async findAll(

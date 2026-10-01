@@ -1,11 +1,11 @@
 generator client {
-    provider = "prisma-client-js"
-    binaryTargets = ["native"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model user {
@@ -13,14 +13,18 @@ model user {
   email      String   @unique
   password   String
   username   String   @unique
+  points     Int      @default(0) // Saldo de puntos (se mueve siempre junto a points_transaction)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   user_supplements      user_supplement[]
   intakes               intake[]
-  friendships_requested friendship[]          @relation("Requester")
-  friendships_received  friendship[]          @relation("Receiver")
+  friendships_requested friendship[]         @relation("Requester")
+  friendships_received  friendship[]         @relation("Receiver")
   notification_config   notification_config?
+  points_transactions   points_transaction[]
+  items                 user_item[]
+  streak_freezes        streak_freeze[]
 }
 
 model supplement_database {
@@ -101,4 +105,49 @@ model notification_config {
   updated_at         DateTime @updatedAt
 
   user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// Historial de puntos ganados (+) y gastados (-).
+// `ref` identifica un premio único ("day:2026-10-01", "streak:7"...) para no darlo dos veces.
+// Las compras van con ref = null (Postgres permite varios null en un unique).
+model points_transaction {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  amount     Int
+  reason     String
+  ref        String?
+  created_at DateTime @default(now())
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, ref])
+  @@index([user_id])
+}
+
+// Objetos del usuario. El catálogo vive en código (src/rewards/shop-catalog.ts).
+model user_item {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  item_code   String
+  quantity    Int      @default(1)
+  equipped    Boolean  @default(false)
+  acquired_at DateTime @default(now())
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, item_code])
+  @@index([user_id])
+}
+
+// Días cubiertos por un protector de racha (cuentan como completos para la racha).
+model streak_freeze {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  day        String // "yyyy-MM-dd"
+  created_at DateTime @default(now())
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, day])
+  @@index([user_id])
 }

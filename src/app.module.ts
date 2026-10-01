@@ -12,6 +12,7 @@ import { FriendsModule } from './friends/friends.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RewardsModule } from './rewards/rewards.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module';
     FriendsModule,
     LeaderboardModule,
     NotificationsModule,
+    RewardsModule,
   ],
   controllers: [AppController],
   providers: [

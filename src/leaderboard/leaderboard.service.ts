@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StreaksService } from '../streaks/streaks.service';
+import { RewardsService } from '../rewards/rewards.service';
 
 @Injectable()
 export class LeaderboardService {
@@ -9,6 +10,7 @@ export class LeaderboardService {
   constructor(
     private prisma: PrismaService,
     private streaksService: StreaksService,
+    private rewardsService: RewardsService,
   ) {}
 
   async getFriendsLeaderboard(userId: number) {
@@ -28,6 +30,9 @@ export class LeaderboardService {
     // Include current user
     const allUserIds = [userId, ...friendIds];
 
+    // Medalla, banner y accesorios de Capsu que lleva cada uno
+    const equipped = await this.rewardsService.getEquippedFor(allUserIds);
+
     // Get streak for each user
     const leaderboard = await Promise.all(
       allUserIds.map(async (id) => {
@@ -43,6 +48,7 @@ export class LeaderboardService {
           username: user?.username,
           currentStreak: streak.current_streak,
           longestStreak: streak.longest_streak,
+          equipped: equipped.get(id) ?? {},
           isCurrentUser: id === userId,
         };
       }),
