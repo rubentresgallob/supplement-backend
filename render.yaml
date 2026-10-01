@@ -18,6 +18,10 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
+      # Los días (rachas, puntos diarios, semanas) se cuentan en hora de España.
+      # Sin esto Render usa UTC y una toma a las 00:30 contaría como del día anterior.
+      - key: TZ
+        value: Europe/Madrid
       # Se pega a mano en el panel de Render (la misma URL de Supabase del .env)
       - key: DATABASE_URL
         sync: false

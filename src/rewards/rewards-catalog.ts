@@ -10,6 +10,12 @@ export const DAILY_REWARD_WINDOW_DAYS = 1;
 /** Días hacia atrás que un protector puede cubrir (48 h). */
 export const STREAK_REPAIR_WINDOW_DAYS = 2;
 
+/**
+ * Racha mínima (días seguidos antes del fallo) para que merezca la pena
+ * gastar un protector. Así no se pierden 150 puntos salvando una racha de 1 día.
+ */
+export const MIN_STREAK_TO_REPAIR = 2;
+
 export interface WeeklyGoal {
   code: string;
   title: string;

@@ -41,7 +41,12 @@ describe('findRepairGap', () => {
   });
 
   it('repara anteayer si une dos tramos de racha', () => {
-    expect(findRepairGap(doneOn(1, 3), TODAY)).toEqual([ago(2)]);
+    expect(findRepairGap(doneOn(1, 3, 4), TODAY)).toEqual([ago(2)]);
+  });
+
+  it('no gasta protector para salvar una racha de 1 solo día', () => {
+    expect(findRepairGap(doneOn(2), TODAY)).toEqual([]);
+    expect(findRepairGap(doneOn(1, 3), TODAY)).toEqual([]);
   });
 
   it('no repara si la racha se perdió hace más de 48 h', () => {

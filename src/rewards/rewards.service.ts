@@ -8,6 +8,7 @@ import {
   Achievement,
   DAILY_COMPLETE_POINTS,
   DAILY_REWARD_WINDOW_DAYS,
+  MIN_STREAK_TO_REPAIR,
   STREAK_REPAIR_WINDOW_DAYS,
   WEEKLY_GOALS,
 } from './rewards-catalog';
@@ -22,8 +23,8 @@ export interface GrantedReward {
 
 /**
  * Días fallados de las últimas 48 h que un protector puede cubrir.
- * Solo hay hueco "reparable" si el día anterior al hueco contaba,
- * es decir, si había una racha que salvar.
+ * Solo hay hueco "reparable" si justo antes del hueco había una racha
+ * de al menos MIN_STREAK_TO_REPAIR días que salvar.
  */
 export function findRepairGap(
   isDone: (day: string) => boolean,
@@ -42,8 +43,10 @@ export function findRepairGap(
   }
 
   if (missed.length === 0) return [];
-  const anchor = dayKey(subDays(base, earliestOffset + 1));
-  return isDone(anchor) ? missed : [];
+  for (let i = 1; i <= MIN_STREAK_TO_REPAIR; i++) {
+    if (!isDone(dayKey(subDays(base, earliestOffset + i)))) return [];
+  }
+  return missed;
 }
 
 @Injectable()

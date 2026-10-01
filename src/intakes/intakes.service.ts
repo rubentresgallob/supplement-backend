@@ -2,12 +2,28 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateIntakeDto } from './dto/create-intake.dto';
 import { startOfDay, endOfDay } from 'date-fns';
 import { RewardsService, GrantedReward } from '../rewards/rewards.service';
+
+/** Antigüedad máxima de una toma registrada a posteriori (evita inventarse rachas). */
+export const MAX_INTAKE_AGE_HOURS = 48;
+
+/**
+ * Fecha de la toma: "ahora" si no viene, nunca en el futuro (reloj del móvil
+ * adelantado) y como mucho de hace 48 h. Devuelve null si es demasiado antigua.
+ */
+export function resolveTakenAt(takenAt: string | undefined, now = new Date()): Date | null {
+  if (!takenAt) return now;
+  const date = new Date(takenAt);
+  if (date > now) return now;
+  const ageHours = (now.getTime() - date.getTime()) / 3_600_000;
+  return ageHours > MAX_INTAKE_AGE_HOURS ? null : date;
+}
 
 @Injectable()
 export class IntakesService {
@@ -40,11 +56,18 @@ export class IntakesService {
       );
     }
 
+    const takenAt = resolveTakenAt(dto.takenAt);
+    if (!takenAt) {
+      throw new BadRequestException(
+        `Solo puedes registrar tomas de las últimas ${MAX_INTAKE_AGE_HOURS} horas`,
+      );
+    }
+
     const intake = await this.prisma.intake.create({
       data: {
         user_id: userId,
         user_supplement_id: dto.userSupplementId,
-        taken_at: dto.takenAt ? new Date(dto.takenAt) : new Date(),
+        taken_at: takenAt,
       },
       include: {
         user_supplement: {
