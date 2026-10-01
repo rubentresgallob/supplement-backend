@@ -10,6 +10,13 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { randomInt } from 'crypto';
+import { addMinutes } from 'date-fns';
+import { MailService } from '../mail/mail.service';
+
+/** Recuperar contraseña: validez del código y máximo de intentos. */
+export const RESET_CODE_MINUTES = 15;
+export const RESET_MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class AuthService {
@@ -18,6 +25,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private mailService: MailService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -129,6 +137,80 @@ export class AuthService {
     await this.prisma.user.delete({ where: { id: userId } });
     this.logger.log(`Cuenta eliminada: usuario ${userId}`);
     return { message: 'Cuenta eliminada' };
+  }
+
+  /**
+   * Envía un código de 6 cifras al email. Responde lo mismo exista o no
+   * la cuenta, para no revelar qué emails están registrados.
+   */
+  async forgotPassword(email: string) {
+    const generic = { message: 'Si el email está registrado, te hemos enviado un código' };
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) return generic;
+
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        reset_code_hash: await bcrypt.hash(code, 10),
+        reset_expires: addMinutes(new Date(), RESET_CODE_MINUTES),
+        reset_attempts: 0,
+      },
+    });
+
+    await this.mailService.send(
+      email,
+      `Tu código: ${code}`,
+      `<div style="font-family:system-ui,sans-serif;max-width:420px">
+        <h2 style="color:#FF6B35">Recupera tu contraseña</h2>
+        <p>Hola ${user.username}, este es tu código para crear una contraseña nueva:</p>
+        <p style="font-size:32px;font-weight:800;letter-spacing:6px">${code}</p>
+        <p>Caduca en ${RESET_CODE_MINUTES} minutos. Si no lo has pedido tú, ignora este email.</p>
+        <p style="color:#888">Suplementos Tracker</p>
+      </div>`,
+      `Tu código para recuperar la contraseña es ${code}. Caduca en ${RESET_CODE_MINUTES} minutos.`,
+    );
+    this.logger.log(`Código de recuperación enviado al usuario ${user.id}`);
+    return generic;
+  }
+
+  /** Cambia la contraseña con el código y devuelve la sesión iniciada. */
+  async resetPassword(email: string, code: string, newPassword: string) {
+    const invalid = new BadRequestException('Código no válido o caducado');
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user?.reset_code_hash || !user.reset_expires || user.reset_expires < new Date()) {
+      throw invalid;
+    }
+    if (user.reset_attempts >= RESET_MAX_ATTEMPTS) {
+      throw new BadRequestException('Demasiados intentos. Pide un código nuevo');
+    }
+    if (!(await bcrypt.compare(code, user.reset_code_hash))) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { reset_attempts: { increment: 1 } },
+      });
+      throw invalid;
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: await bcrypt.hash(newPassword, 10),
+        reset_code_hash: null,
+        reset_expires: null,
+        reset_attempts: 0,
+      },
+    });
+    this.logger.log(`Contraseña restablecida: usuario ${user.id}`);
+    return {
+      access_token: this.jwtService.sign({ sub: updated.id, email: updated.email }),
+      user: {
+        id: updated.id,
+        email: updated.email,
+        username: updated.username,
+        created_at: updated.created_at,
+      },
+    };
   }
 
   async getProfile(userId: number) {

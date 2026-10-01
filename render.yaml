@@ -31,3 +31,8 @@ services:
       # Render genera una clave nueva y segura
       - key: JWT_SECRET
         generateValue: true
+      # Emails (recuperar contraseña) con Brevo. Sin ellas el código solo sale en los logs.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM # email remitente verificado en Brevo
+        sync: false

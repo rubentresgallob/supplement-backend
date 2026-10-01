@@ -14,12 +14,14 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { MailModule } from './mail/mail.service';
 import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [
     PrismaModule,
     SubscriptionModule,
+    MailModule,
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 60,

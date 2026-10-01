@@ -13,6 +13,8 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -69,5 +71,27 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Contraseña incorrecta' })
   async deleteAccount(@Request() req, @Body() dto: DeleteAccountDto) {
     return this.authService.deleteAccount(req.user.id, dto.password);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Enviar un código de 6 cifras para recuperar la contraseña' })
+  @ApiResponse({ status: 200, description: 'Respuesta genérica (no revela si el email existe)' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email.trim());
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Cambiar la contraseña con el código (devuelve la sesión iniciada)' })
+  @ApiResponse({ status: 400, description: 'Código no válido, caducado o demasiados intentos' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(
+      dto.email.trim(),
+      dto.code,
+      dto.newPassword,
+    );
   }
 }
