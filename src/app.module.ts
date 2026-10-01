@@ -13,10 +13,13 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RewardsModule } from './rewards/rewards.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [
     PrismaModule,
+    SubscriptionModule,
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 60,
@@ -30,6 +33,7 @@ import { RewardsModule } from './rewards/rewards.module';
     LeaderboardModule,
     NotificationsModule,
     RewardsModule,
+    StatsModule,
   ],
   controllers: [AppController],
   providers: [

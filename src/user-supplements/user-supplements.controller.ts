@@ -14,6 +14,8 @@ import {
 import { UserSupplementsService } from './user-supplements.service';
 import { CreateUserSupplementDto } from './dto/create-user-supplement.dto';
 import { UpdateUserSupplementDto } from './dto/update-user-supplement.dto';
+import { UpdateStockDto } from './dto/update-stock.dto';
+import { ProGuard } from '../subscription/pro.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 
@@ -81,6 +83,19 @@ export class UserSupplementsController {
       id,
       updateUserSupplementDto,
     );
+  }
+
+  @Put(':id/stock')
+  @UseGuards(ProGuard)
+  @ApiOperation({ summary: 'Configurar el stock de un suplemento (solo Pro)' })
+  @ApiParam({ name: 'id', example: 1, description: 'User supplement ID' })
+  @ApiResponse({ status: 403, description: 'PRO_REQUIRED o no es tuyo' })
+  async updateStock(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStockDto,
+  ) {
+    return this.userSupplementsService.updateStock(req.user.id, id, dto);
   }
 
   @Delete(':id')

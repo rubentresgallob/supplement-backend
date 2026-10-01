@@ -5,6 +5,7 @@
  * - `slot`: hueco donde se equipa. Solo un objeto equipado por slot.
  * - `price: null` → no se puede comprar, se desbloquea con un logro.
  * - `colors`: degradado para banners / skins de Capsu (la app los pinta).
+ * - `proOnly`: solo se puede comprar con el plan Pro (si deja Pro, lo conserva).
  */
 export type ItemCategory = 'consumable' | 'medal' | 'banner' | 'capsu';
 export type ItemSlot =
@@ -27,6 +28,7 @@ export interface ShopItem {
   rarity: ItemRarity;
   maxOwned: number;
   colors?: string[];
+  proOnly?: boolean;
 }
 
 export const STREAK_FREEZE_CODE = 'streak_freeze';
@@ -70,6 +72,12 @@ export const SHOP_ITEMS: ShopItem[] = [
   { code: 'capsu_neck_medal', name: 'Medalla al cuello', description: 'Capsu también compite.', category: 'capsu', slot: 'capsu_neck', price: 250, icon: '🏅', rarity: 'rare', maxOwned: 1 },
   { code: 'capsu_skin_mint', name: 'Capsu menta', description: 'Un Capsu fresquito.', category: 'capsu', slot: 'capsu_skin', price: 300, icon: '🍃', rarity: 'rare', maxOwned: 1, colors: ['#3EB489', '#A8E6CF'] },
   { code: 'capsu_skin_gold', name: 'Capsu dorado', description: 'El Capsu más brillante.', category: 'capsu', slot: 'capsu_skin', price: 800, icon: '✨', rarity: 'legendary', maxOwned: 1, colors: ['#F7971E', '#FFD200'] },
+
+  // === Exclusivos Pro ===
+  { code: 'medal_pro_diamond', name: 'Diamante Pro', description: 'La medalla de los miembros Pro.', category: 'medal', slot: 'medal', price: 200, icon: '💎', rarity: 'epic', maxOwned: 1, proOnly: true },
+  { code: 'banner_aurora', name: 'Aurora', description: 'Un cielo boreal solo para Pro.', category: 'banner', slot: 'banner', price: 250, icon: '🌠', rarity: 'epic', maxOwned: 1, colors: ['#00C9A7', '#845EC2'], proOnly: true },
+  { code: 'capsu_head_halo', name: 'Aureola', description: 'Capsu, el más constante del cielo.', category: 'capsu', slot: 'capsu_head', price: 300, icon: '😇', rarity: 'epic', maxOwned: 1, proOnly: true },
+  { code: 'capsu_skin_galaxy', name: 'Capsu galaxia', description: 'Un Capsu de otro planeta.', category: 'capsu', slot: 'capsu_skin', price: 500, icon: '🌌', rarity: 'legendary', maxOwned: 1, colors: ['#4E54C8', '#8F94FB'], proOnly: true },
 ];
 
 export const findShopItem = (code: string) =>

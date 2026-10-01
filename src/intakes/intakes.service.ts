@@ -82,6 +82,19 @@ export class IntakesService {
       `Intake recorded: ${intake.id} for user ${userId}, supplement ${dto.userSupplementId}`,
     );
 
+    // Stock (Pro): cada toma gasta sus unidades, sin bajar de 0
+    if (userSupplement.stock_units !== null) {
+      await this.prisma.user_supplement.update({
+        where: { id: userSupplement.id },
+        data: {
+          stock_units: Math.max(
+            0,
+            userSupplement.stock_units - userSupplement.units_per_intake,
+          ),
+        },
+      });
+    }
+
     // Premios ganados con esta toma (día completo, logros...). Si falla, la toma ya está guardada.
     let rewards: GrantedReward[] = [];
     try {

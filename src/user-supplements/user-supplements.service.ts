@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserSupplementDto } from './dto/create-user-supplement.dto';
 import { UpdateUserSupplementDto } from './dto/update-user-supplement.dto';
+import { UpdateStockDto } from './dto/update-stock.dto';
 
 @Injectable()
 export class UserSupplementsService {
@@ -123,6 +124,19 @@ export class UserSupplementsService {
 
     this.logger.log(`User supplement updated: ${id} by user ${userId}`);
     return updated;
+  }
+
+  /** Pro: unidades que quedan y cuántas se gastan por toma. */
+  async updateStock(userId: number, id: number, dto: UpdateStockDto) {
+    await this.findOne(userId, id);
+    return this.prisma.user_supplement.update({
+      where: { id },
+      data: {
+        stock_units: dto.stockUnits,
+        units_per_intake: dto.unitsPerIntake,
+      },
+      include: { supplement_database: true },
+    });
   }
 
   async remove(userId: number, id: number) {

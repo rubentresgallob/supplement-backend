@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { startOfDay, startOfISOWeek, subDays, addDays, isAfter } from 'date-fns';
+import { startOfDay, startOfISOWeek, subDays, addDays, isAfter, format } from 'date-fns';
 import { PrismaService } from '../prisma/prisma.service';
 import { StreaksService, DayStatus } from '../streaks/streaks.service';
 import { computeStreaks, dayKey } from '../streaks/streak-utils';
@@ -13,6 +13,8 @@ import {
   WEEKLY_GOALS,
 } from './rewards-catalog';
 import { findShopItem, STREAK_FREEZE_CODE } from './shop-catalog';
+import { SubscriptionService } from '../subscription/subscription.service';
+import { PRO_POINTS_MULTIPLIER } from '../subscription/pro-plan';
 
 export interface GrantedReward {
   ref: string;
@@ -56,6 +58,7 @@ export class RewardsService {
   constructor(
     private prisma: PrismaService,
     private streaksService: StreaksService,
+    private subscriptionService: SubscriptionService,
   ) {}
 
   /**
@@ -63,8 +66,18 @@ export class RewardsService {
    * Es idempotente: se puede llamar tantas veces como se quiera.
    */
   async sync(userId: number) {
-    const status = await this.streaksService.getDayStatus(userId);
+    const [status, isPro] = await Promise.all([
+      this.streaksService.getDayStatus(userId),
+      this.subscriptionService.isPro(userId),
+    ]);
+    // Pro: protector gratis del mes (antes de reparar, por si hace falta ya)
+    const monthlyProtector = isPro ? await this.grantMonthlyProtector(userId) : null;
     const repairedDays = await this.autoRepairStreak(userId, status);
+
+    // Pro: puntos x1,5 en días completos y objetivos semanales
+    const boost = (points: number) =>
+      isPro ? Math.round(points * PRO_POINTS_MULTIPLIER) : points;
+    const proSuffix = isPro ? ' (Pro x1,5)' : '';
 
     const isDone = (day: string) =>
       status.completedDays.has(day) || status.frozenDays.has(day);
@@ -78,7 +91,7 @@ export class RewardsService {
       select: { ref: true },
     });
     const grantedRefs = new Set(existing.map((t) => t.ref as string));
-    const granted: GrantedReward[] = [];
+    const granted: GrantedReward[] = monthlyProtector ? [monthlyProtector] : [];
 
     const tryGrant = async (reward: GrantedReward) => {
       if (grantedRefs.has(reward.ref)) return;
@@ -95,8 +108,8 @@ export class RewardsService {
       if (status.completedDays.has(day)) {
         await tryGrant({
           ref: `day:${day}`,
-          reason: 'Día completo',
-          points: DAILY_COMPLETE_POINTS,
+          reason: `Día completo${proSuffix}`,
+          points: boost(DAILY_COMPLETE_POINTS),
         });
       }
     }
@@ -107,8 +120,8 @@ export class RewardsService {
       if (week.completedDays >= goal.daysRequired) {
         await tryGrant({
           ref: `${goal.code}:${week.weekStart}`,
-          reason: goal.title,
-          points: goal.points,
+          reason: `${goal.title}${proSuffix}`,
+          points: boost(goal.points),
         });
       }
     }
@@ -244,6 +257,40 @@ export class RewardsService {
       result.set(item.user_id, equipped);
     }
     return result;
+  }
+
+  /**
+   * Pro: un protector de racha gratis cada mes. Si ya tiene el máximo,
+   * no se marca como entregado y se le dará cuando gaste uno ese mismo mes.
+   */
+  private async grantMonthlyProtector(userId: number): Promise<GrantedReward | null> {
+    const ref = `pro_protector:${format(new Date(), 'yyyy-MM')}`;
+    const maxOwned = findShopItem(STREAK_FREEZE_CODE)?.maxOwned ?? 2;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const already = await tx.points_transaction.findUnique({
+          where: { user_id_ref: { user_id: userId, ref } },
+        });
+        if (already) return null;
+        const owned = await tx.user_item.findUnique({
+          where: { user_id_item_code: { user_id: userId, item_code: STREAK_FREEZE_CODE } },
+        });
+        if ((owned?.quantity ?? 0) >= maxOwned) return null;
+
+        await tx.points_transaction.create({
+          data: { user_id: userId, amount: 0, reason: 'Pro: protector del mes', ref },
+        });
+        await tx.user_item.upsert({
+          where: { user_id_item_code: { user_id: userId, item_code: STREAK_FREEZE_CODE } },
+          create: { user_id: userId, item_code: STREAK_FREEZE_CODE },
+          update: { quantity: { increment: 1 } },
+        });
+        return { ref, reason: 'Pro: protector del mes', points: 0, item: STREAK_FREEZE_CODE };
+      });
+    } catch (error) {
+      if (error?.code === 'P2002') return null; // otra petición lo entregó a la vez
+      throw error;
+    }
   }
 
   /** Entrega un premio. Devuelve false si ya se había dado (ref repetida). */

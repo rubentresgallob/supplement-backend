@@ -9,13 +9,15 @@ datasource db {
 }
 
 model user {
-  id         Int      @id @default(autoincrement())
-  email      String   @unique
+  id         Int       @id @default(autoincrement())
+  email      String    @unique
   password   String
-  username   String   @unique
-  points     Int      @default(0) // Saldo de puntos (se mueve siempre junto a points_transaction)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  username   String    @unique
+  points     Int       @default(0) // Saldo de puntos (se mueve siempre junto a points_transaction)
+  pro_until  DateTime? // Es Pro mientras pro_until > ahora
+  pro_source String? // "test" (modo de prueba) · "revenuecat" (pago real, más adelante)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
 
   user_supplements      user_supplement[]
   intakes               intake[]
@@ -53,6 +55,8 @@ model user_supplement {
   times_per_day          Int
   schedules              String[] // Array of time strings like ["08:00", "14:00", "20:00"]
   active                 Boolean  @default(true)
+  stock_units            Float? // Pro: unidades que quedan (null = sin control de stock)
+  units_per_intake       Float    @default(1) // Unidades que se gastan en cada toma
   created_at             DateTime @default(now())
   updated_at             DateTime @updatedAt
 

@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RewardsService } from './rewards.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { findShopItem, SHOP_ITEMS } from './shop-catalog';
 
 @Injectable()
@@ -15,22 +17,25 @@ export class ShopService {
   constructor(
     private prisma: PrismaService,
     private rewardsService: RewardsService,
+    private subscriptionService: SubscriptionService,
   ) {}
 
   /** Catálogo con lo que el usuario ya tiene y si se lo puede permitir. */
   async getItems(userId: number) {
-    const [user, owned] = await Promise.all([
+    const [user, owned, isPro] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: userId },
         select: { points: true },
       }),
       this.prisma.user_item.findMany({ where: { user_id: userId } }),
+      this.subscriptionService.isPro(userId),
     ]);
     const points = user?.points ?? 0;
     const ownedByCode = new Map(owned.map((i) => [i.item_code, i]));
 
     return {
       points,
+      isPro,
       items: SHOP_ITEMS.map((item) => {
         const mine = ownedByCode.get(item.code);
         const quantity = mine?.quantity ?? 0;
@@ -39,8 +44,10 @@ export class ShopService {
           owned: quantity,
           equipped: mine?.equipped ?? false,
           exclusive: item.price === null,
+          proOnly: item.proOnly ?? false,
           canBuy:
             item.price !== null &&
+            (!item.proOnly || isPro) &&
             quantity < item.maxOwned &&
             points >= item.price,
         };
@@ -57,6 +64,13 @@ export class ShopService {
       );
     }
     const price = item.price;
+    if (item.proOnly && !(await this.subscriptionService.isPro(userId))) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'PRO_REQUIRED',
+        message: 'Este objeto es exclusivo del plan Pro',
+      });
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const mine = await tx.user_item.findUnique({
