@@ -9,19 +9,23 @@ datasource db {
 }
 
 model user {
-  id              Int       @id @default(autoincrement())
-  email           String    @unique
-  password        String
-  username        String    @unique
-  points          Int       @default(0) // Saldo de puntos (se mueve siempre junto a points_transaction)
-  pro_until       DateTime? // Es Pro mientras pro_until > ahora
-  pro_source      String? // "test" (modo de prueba) · "revenuecat" (pago real, más adelante)
-  reset_code_hash String? // Recuperar contraseña: código de 6 cifras (hasheado)
-  reset_expires   DateTime?
-  reset_attempts  Int       @default(0)
-  consent_at      DateTime? // RGPD: cuándo aceptó términos, privacidad y el tratamiento de datos de salud
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
+  id               Int       @id @default(autoincrement())
+  email            String    @unique
+  password         String
+  username         String    @unique
+  points           Int       @default(0) // Saldo de puntos (se mueve siempre junto a points_transaction)
+  pro_until        DateTime? // Es Pro mientras pro_until > ahora
+  pro_source       String? // "test" (modo de prueba) · "revenuecat" (pago real, más adelante)
+  reset_code_hash  String? // Recuperar contraseña: código de 6 cifras (hasheado)
+  reset_expires    DateTime?
+  reset_attempts   Int       @default(0)
+  consent_at       DateTime? // RGPD: cuándo aceptó términos, privacidad y el tratamiento de datos de salud
+  email_verified   Boolean   @default(false) // Sin verificar no puede iniciar sesión; se borra a las 24 h
+  verify_code_hash String? // Verificar email: código de 6 cifras (hasheado)
+  verify_sent_at   DateTime? // Cuándo se envió el último código (para no reenviar en bucle)
+  verify_attempts  Int       @default(0)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
 
   user_supplements      user_supplement[]
   intakes               intake[]

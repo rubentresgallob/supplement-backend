@@ -8,12 +8,17 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Ip,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
-import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
+import {
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+} from './dto/password-reset.dto';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -26,12 +31,14 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  // Máx. 5 cuentas por hora desde la misma IP (frena la creación masiva de cuentas falsas)
+  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
   @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({ status: 201, description: 'User successfully registered' })
+  @ApiResponse({ status: 201, description: 'Cuenta creada; falta verificar el email (no devuelve sesión)' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 409, description: 'User already exists' })
-  async register(@Body() registerDto: RegisterDto) {
-    this.logger.log(`Registration attempt for email: ${registerDto.email}`);
+  async register(@Body() registerDto: RegisterDto, @Ip() ip: string) {
+    this.logger.log(`Registration attempt for email: ${registerDto.email} (IP ${ip})`);
     const result = await this.authService.register(registerDto);
     this.logger.log(`User registered successfully: ${registerDto.email}`);
     return result;
@@ -39,14 +46,34 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login user' })
   @ApiResponse({ status: 200, description: 'User successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 403, description: 'EMAIL_NOT_VERIFIED: se reenvía el código' })
   async login(@Body() loginDto: LoginDto) {
     this.logger.log(`Login attempt for email: ${loginDto.email}`);
     const result = await this.authService.login(loginDto);
     this.logger.log(`User logged in successfully: ${loginDto.email}`);
     return result;
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Verificar el email con el código de 6 cifras (devuelve la sesión iniciada)' })
+  @ApiResponse({ status: 400, description: 'Código no válido, caducado o demasiados intentos' })
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.email.trim(), dto.code);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Reenviar el código de verificación (máx. 1 por minuto)' })
+  @ApiResponse({ status: 200, description: 'Respuesta genérica (no revela si el email existe)' })
+  async resendVerification(@Body() dto: ForgotPasswordDto) {
+    return this.authService.resendVerification(dto.email.trim());
   }
 
   @Get('profile')
