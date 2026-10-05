@@ -9,11 +9,6 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // En Render las peticiones llegan a través de su proxy. Sin esto, todas parecen venir
-  // de la misma IP y los límites por IP (registro, login...) se comparten entre todos.
-  // TRUST_PROXY = nº de proxies delante (en local no hay ninguno).
-  app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 0));
-
   // Demo web (carpeta public/ en la raíz del proyecto, tanto en local como en Render)
   app.useStaticAssets(join(process.cwd(), 'public'));
 

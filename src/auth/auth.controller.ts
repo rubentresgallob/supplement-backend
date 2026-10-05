@@ -8,7 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
-  Ip,
+  Req,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -20,6 +20,7 @@ import {
   VerifyEmailDto,
 } from './dto/password-reset.dto';
 import { Throttle } from '@nestjs/throttler';
+import { clientIp } from '../common/client-ip';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -37,8 +38,8 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'Cuenta creada; falta verificar el email (no devuelve sesión)' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 409, description: 'User already exists' })
-  async register(@Body() registerDto: RegisterDto, @Ip() ip: string) {
-    this.logger.log(`Registration attempt for email: ${registerDto.email} (IP ${ip})`);
+  async register(@Body() registerDto: RegisterDto, @Req() req) {
+    this.logger.log(`Registration attempt for email: ${registerDto.email} (IP ${clientIp(req)})`);
     const result = await this.authService.register(registerDto);
     this.logger.log(`User registered successfully: ${registerDto.email}`);
     return result;
