@@ -77,20 +77,6 @@ export class AuthController {
     return this.authService.resendVerification(dto.email.trim());
   }
 
-  // TEMPORAL: ver qué cabeceras de IP manda Render (borrar tras comprobarlo)
-  @Get('ip-debug')
-  ipDebug(@Req() req) {
-    const h = req.headers;
-    return {
-      socket: req.socket?.remoteAddress,
-      ip: req.ip,
-      tracker: clientIp(req),
-      headers: Object.fromEntries(
-        Object.entries(h).filter(([k]) => /ip|forwarded|cf-|client|real/i.test(k)),
-      ),
-    };
-  }
-
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
