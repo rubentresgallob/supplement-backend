@@ -1,3 +1,4 @@
+import { IsBoolean } from 'class-validator';
 import { IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -9,4 +10,9 @@ export class FriendRequestDto {
   @IsString()
   @MinLength(3)
   identifier: string;
+}
+
+export class SharingDto {
+  @IsBoolean()
+  enabled: boolean;
 }

@@ -1,17 +1,20 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Body,
   Param,
+  Query,
   Request,
   UseGuards,
   ParseIntPipe,
   Logger,
 } from '@nestjs/common';
 import { FriendsService } from './friends.service';
-import { FriendRequestDto } from './dto/friend-request.dto';
+import { FriendRequestDto, SharingDto } from './dto/friend-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 
@@ -118,5 +121,44 @@ export class FriendsController {
       `User ID ${req.user.id} viewing progress of friend ${friendId}`,
     );
     return this.friendsService.getFriendProgress(req.user.id, friendId);
+  }
+
+  @Get('sharing')
+  @ApiOperation({ summary: '¿Comparto mi stack y mi calendario con mis amigos?' })
+  getSharing(@Request() req) {
+    return this.friendsService.getSharing(req.user.id);
+  }
+
+  @Put('sharing')
+  @ApiOperation({ summary: 'Activar o desactivar que mis amigos vean mi stack y mi calendario' })
+  setSharing(@Request() req, @Body() dto: SharingDto) {
+    return this.friendsService.setSharing(req.user.id, dto.enabled);
+  }
+
+  @Get(':friendId/profile')
+  @ApiOperation({ summary: 'Perfil de un amigo: Capsu, racha y, si lo comparte, su stack de hoy' })
+  @ApiResponse({ status: 403, description: 'No sois amigos' })
+  getFriendProfile(@Request() req, @Param('friendId', ParseIntPipe) friendId: number) {
+    return this.friendsService.getFriendProfile(req.user.id, friendId);
+  }
+
+  @Get(':friendId/calendar')
+  @ApiOperation({ summary: 'Calendario mensual de un amigo (si lo comparte)' })
+  @ApiResponse({ status: 403, description: 'No sois amigos, o SHARING_DISABLED' })
+  getFriendCalendar(
+    @Request() req,
+    @Param('friendId', ParseIntPipe) friendId: number,
+    @Query('month') month?: string,
+  ) {
+    const now = new Date();
+    let year = now.getFullYear();
+    let m = now.getMonth() + 1;
+    if (month) {
+      const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+      if (!match) throw new BadRequestException('month debe tener el formato AAAA-MM');
+      year = Number(match[1]);
+      m = Number(match[2]);
+    }
+    return this.friendsService.getFriendCalendar(req.user.id, friendId, year, m);
   }
 }

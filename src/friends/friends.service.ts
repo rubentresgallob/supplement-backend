@@ -7,6 +7,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StreaksService } from '../streaks/streaks.service';
+import { RewardsService } from '../rewards/rewards.service';
+import { CalendarService } from '../calendar/calendar.service';
+import { startOfDay, endOfDay } from 'date-fns';
 
 @Injectable()
 export class FriendsService {
@@ -15,6 +18,8 @@ export class FriendsService {
   constructor(
     private prisma: PrismaService,
     private streaksService: StreaksService,
+    private rewardsService: RewardsService,
+    private calendarService: CalendarService,
   ) {}
 
   async sendRequest(userId: number, identifier: string) {
@@ -361,5 +366,105 @@ export class FriendsService {
       activeSupplements: activeSupplementsCount,
       last30DaysAdherence: adherencePercent,
     };
+  }
+
+  // ── Perfil de un amigo ────────────────────────────────────────────────────
+
+  /** Lanza 403 si no son amigos (amistad aceptada). */
+  private async assertFriends(userId: number, friendId: number) {
+    const friendship = await this.prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { requester_id: userId, receiver_id: friendId },
+          { requester_id: friendId, receiver_id: userId },
+        ],
+        status: 'accepted',
+      },
+    });
+    if (!friendship) {
+      throw new ForbiddenException('Can only view progress of accepted friends');
+    }
+  }
+
+  /** ¿Deja este usuario que sus amigos vean su stack y su calendario? */
+  async getSharing(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { share_with_friends: true },
+    });
+    return { enabled: user?.share_with_friends ?? true };
+  }
+
+  async setSharing(userId: number, enabled: boolean) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { share_with_friends: enabled },
+    });
+    return { enabled };
+  }
+
+  /**
+   * Perfil de un amigo: su Capsu (objetos equipados), racha y cumplimiento.
+   * Su stack y lo que ha tomado hoy solo van si él lo comparte (`sharing`).
+   */
+  async getFriendProfile(userId: number, friendId: number) {
+    const progress = await this.getFriendProgress(userId, friendId); // comprueba la amistad
+    const [friend, equipped] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: friendId },
+        select: { share_with_friends: true, created_at: true },
+      }),
+      this.rewardsService.getEquippedFor([friendId]),
+    ]);
+    const sharing = friend?.share_with_friends ?? true;
+
+    return {
+      ...progress,
+      memberSince: friend?.created_at ?? null,
+      equipped: equipped.get(friendId) ?? {},
+      sharing,
+      today: sharing ? await this.todayOf(friendId) : null,
+    };
+  }
+
+  /** Stack activo de un usuario con lo que lleva tomado hoy. */
+  private async todayOf(userId: number) {
+    const now = new Date();
+    const supplements = await this.prisma.user_supplement.findMany({
+      where: { user_id: userId, active: true },
+      include: {
+        supplement_database: { select: { name: true } },
+        intakes: {
+          where: { taken_at: { gte: startOfDay(now), lte: endOfDay(now) } },
+          select: { id: true },
+        },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+    const list = supplements.map((s) => ({
+      id: s.id,
+      name: s.supplement_database?.name ?? s.custom_name ?? 'Suplemento',
+      form: s.form,
+      dosageAmount: s.dosage_amount,
+      dosageUnit: s.dosage_unit,
+      taken: Math.min(s.intakes.length, s.times_per_day),
+      expected: s.times_per_day,
+    }));
+    const taken = list.reduce((a, s) => a + s.taken, 0);
+    const expected = list.reduce((a, s) => a + s.expected, 0);
+    return { supplements: list, taken, expected, complete: expected > 0 && taken >= expected };
+  }
+
+  /** Calendario mensual de un amigo (solo si lo comparte). */
+  async getFriendCalendar(userId: number, friendId: number, year: number, month: number) {
+    await this.assertFriends(userId, friendId);
+    const { enabled } = await this.getSharing(friendId);
+    if (!enabled) {
+      throw new ForbiddenException({
+        message: 'Tu amigo no comparte su calendario',
+        code: 'SHARING_DISABLED',
+      });
+    }
+    return this.calendarService.getMonth(friendId, year, month);
   }
 }

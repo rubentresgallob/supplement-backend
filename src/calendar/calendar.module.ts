@@ -35,5 +35,6 @@ class CalendarController {
 @Module({
   controllers: [CalendarController],
   providers: [CalendarService],
+  exports: [CalendarService],
 })
 export class CalendarModule {}

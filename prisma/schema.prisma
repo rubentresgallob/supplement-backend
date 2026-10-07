@@ -19,6 +19,7 @@ model user {
   reset_code_hash  String? // Recuperar contraseña: código de 6 cifras (hasheado)
   reset_expires    DateTime?
   reset_attempts   Int       @default(0)
+  share_with_friends Boolean @default(true) // Sus amigos ven su stack, lo que toma hoy y su calendario
   consent_at       DateTime? // RGPD: cuándo aceptó términos, privacidad y el tratamiento de datos de salud
   email_verified   Boolean   @default(false) // Sin verificar no puede iniciar sesión; se borra a las 24 h
   verify_code_hash String? // Verificar email: código de 6 cifras (hasheado)
