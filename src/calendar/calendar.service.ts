@@ -8,6 +8,8 @@ export interface CalendarSupplement {
   name: string;
   times_per_day: number;
   created_at: Date;
+  /** Si el usuario lo quitó de su rutina: cuenta hasta el día anterior. */
+  deleted_at?: Date | null;
 }
 
 /**
@@ -18,7 +20,8 @@ export type DayStatus = 'complete' | 'partial' | 'missed' | 'pending' | 'none' |
 
 /**
  * Cálculo puro de un mes del calendario (testeable sin BD).
- * Un suplemento solo "se espera" desde el día en que se añadió.
+ * Un suplemento solo "se espera" desde el día en que se añadió y, si se quitó de la
+ * rutina, hasta el día anterior (el día en que se quitó solo cuenta lo que se llegó a tomar).
  * @param month 1-12
  */
 export function buildMonth(
@@ -49,7 +52,7 @@ export function buildMonth(
     taken: number;
     expected: number;
     protected: boolean;
-    supplements: { id: number; name: string; taken: number; expected: number }[];
+    supplements: { id: number; name: string; taken: number; expected: number; retired: boolean }[];
   }[] = [];
 
   for (let d = first; !isAfter(d, last); d = addDays(d, 1)) {
@@ -60,13 +63,22 @@ export function buildMonth(
     }
     let taken = 0;
     let expected = 0;
-    const detail: { id: number; name: string; taken: number; expected: number }[] = [];
+    const detail: { id: number; name: string; taken: number; expected: number; retired: boolean }[] = [];
     for (const s of supplements) {
       if (isAfter(startOfDay(s.created_at), d)) continue;
       const done = Math.min(counts.get(key)?.get(s.id) ?? 0, s.times_per_day);
+      let due = s.times_per_day;
+      if (s.deleted_at) {
+        const removedOn = startOfDay(s.deleted_at);
+        if (isAfter(d, removedOn)) continue; // ya no estaba en la rutina
+        if (dayKey(d) === dayKey(removedOn)) {
+          if (done === 0) continue;
+          due = done; // el día que se quitó no penaliza lo que faltaba
+        }
+      }
       taken += done;
-      expected += s.times_per_day;
-      detail.push({ id: s.id, name: s.name, taken: done, expected: s.times_per_day });
+      expected += due;
+      detail.push({ id: s.id, name: s.name, taken: done, expected: due, retired: !!s.deleted_at });
     }
     let status: DayStatus;
     if (expected === 0) status = 'none';
@@ -106,7 +118,8 @@ export class CalendarService {
     const to = endOfMonth(first);
     const [supplements, intakes, freezes] = await Promise.all([
       this.prisma.user_supplement.findMany({
-        where: { user_id: userId, active: true },
+        // Activos + los que el usuario quitó (siguen contando en su historial)
+        where: { user_id: userId, OR: [{ active: true }, { deleted_at: { not: null } }] },
         include: { supplement_database: { select: { name: true } } },
         orderBy: { created_at: 'asc' },
       }),
@@ -126,6 +139,7 @@ export class CalendarService {
         name: s.supplement_database?.name ?? s.custom_name ?? 'Suplemento',
         times_per_day: s.times_per_day,
         created_at: s.created_at,
+        deleted_at: s.deleted_at,
       })),
       intakes,
       new Set(freezes.map((f) => f.day)),

@@ -67,7 +67,8 @@ export class UserSupplementsService {
 
   async findAll(userId: number) {
     const supplements = await this.prisma.user_supplement.findMany({
-      where: { user_id: userId },
+      // Los retirados se conservan solo para el historial (calendario)
+      where: { user_id: userId, deleted_at: null },
       include: {
         supplement_database: true,
       },
@@ -85,7 +86,7 @@ export class UserSupplementsService {
       },
     });
 
-    if (!supplement) {
+    if (!supplement || supplement.deleted_at) {
       this.logger.warn(`User supplement not found: ${id}`);
       throw new NotFoundException('Supplement not found');
     }
@@ -143,8 +144,11 @@ export class UserSupplementsService {
     // Verify ownership
     await this.findOne(userId, id);
 
-    await this.prisma.user_supplement.delete({
+    // No se borra de verdad: así el calendario sigue mostrando lo que se tomó
+    // mientras estuvo en la rutina. Deja de contar desde hoy.
+    await this.prisma.user_supplement.update({
       where: { id },
+      data: { active: false, deleted_at: new Date() },
     });
 
     this.logger.log(`User supplement deleted: ${id} by user ${userId}`);

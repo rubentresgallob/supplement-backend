@@ -67,6 +67,7 @@ model user_supplement {
   units_per_intake       Float    @default(1) // Unidades que se gastan en cada toma
   created_at             DateTime @default(now())
   updated_at             DateTime @updatedAt
+  deleted_at             DateTime? // Retirado por el usuario: no se borra, para conservar su historial
 
   user                user                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
   supplement_database supplement_database? @relation(fields: [supplement_database_id], references: [id])

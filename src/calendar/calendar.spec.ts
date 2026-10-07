@@ -47,11 +47,47 @@ describe('buildMonth', () => {
 
   it('detalla qué faltó y marca los días salvados por un protector', () => {
     expect(day(4).supplements).toEqual([
-      { id: 1, name: 'Creatina', taken: 1, expected: 1 },
-      { id: 2, name: 'Omega 3', taken: 1, expected: 2 },
+      { id: 1, name: 'Creatina', taken: 1, expected: 1, retired: false },
+      { id: 2, name: 'Omega 3', taken: 1, expected: 2, retired: false },
     ]);
     expect(day(5)).toMatchObject({ status: 'missed', protected: true });
     expect(month.summary).toEqual({ complete: 2, partial: 2, missed: 2, protected: 1 });
+  });
+
+  describe('suplemento que el usuario quitó de su rutina', () => {
+    // Magnesio: añadido el 1 de oct, quitado el 5 de oct por la tarde
+    const magnesio = { id: 3, name: 'Magnesio', times_per_day: 2, created_at: at(1, 8), deleted_at: at(5, 18) };
+    const taken = [
+      { user_supplement_id: 3, taken_at: at(1, 9) },
+      { user_supplement_id: 3, taken_at: at(1, 21) },
+      { user_supplement_id: 3, taken_at: at(2, 9) },
+      // día 3 y 4: nada
+      { user_supplement_id: 3, taken_at: at(5, 9) }, // el día que lo quitó tomó 1 de 2
+    ];
+    const m = buildMonth([magnesio], taken, new Set(), 2026, 10, TODAY);
+    const d = (n: number) => m.days[n - 1];
+
+    it('conserva los días en que sí estaba en la rutina', () => {
+      expect(d(1)).toMatchObject({ status: 'complete', taken: 2, expected: 2 });
+      expect(d(2)).toMatchObject({ status: 'partial', taken: 1, expected: 2 });
+      expect(d(3).status).toBe('missed');
+      expect(d(1).supplements[0]).toMatchObject({ name: 'Magnesio', retired: true });
+    });
+
+    it('el día que se quitó solo cuenta lo que se llegó a tomar', () => {
+      expect(d(5)).toMatchObject({ status: 'complete', taken: 1, expected: 1 });
+    });
+
+    it('deja de contar a partir del día siguiente', () => {
+      expect(d(6)).toMatchObject({ status: 'none', expected: 0, supplements: [] });
+      expect(d(7).status).toBe('none'); // hoy
+    });
+
+    it('si el día que se quitó no se había tomado nada, ese día no cuenta', () => {
+      const m2 = buildMonth([{ ...magnesio, deleted_at: at(3, 10) }], taken, new Set(), 2026, 10, TODAY);
+      expect(m2.days[2]).toMatchObject({ status: 'none', expected: 0 });
+      expect(m2.days[1].status).toBe('partial');
+    });
   });
 
   it('un mes anterior a cualquier suplemento no tiene nada que tomar', () => {

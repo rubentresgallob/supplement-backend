@@ -40,7 +40,7 @@ export class IntakesService {
       where: { id: dto.userSupplementId },
     });
 
-    if (!userSupplement) {
+    if (!userSupplement || userSupplement.deleted_at) {
       this.logger.warn(
         `User supplement not found: ${dto.userSupplementId}`,
       );
