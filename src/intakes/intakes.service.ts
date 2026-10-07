@@ -106,6 +106,49 @@ export class IntakesService {
     return { ...intake, rewards };
   }
 
+  /**
+   * Deshace la última toma de HOY de un suplemento (un toque por error).
+   * Devuelve el stock gastado. Los puntos ya ganados no se quitan: cada premio
+   * se concede una sola vez, así que volver a completar el día no da más.
+   */
+  async undoLast(userId: number, userSupplementId: number) {
+    const userSupplement = await this.prisma.user_supplement.findUnique({
+      where: { id: userSupplementId },
+    });
+    if (!userSupplement) {
+      throw new NotFoundException('User supplement not found');
+    }
+    if (userSupplement.user_id !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to change intakes of this supplement',
+      );
+    }
+
+    const now = new Date();
+    const last = await this.prisma.intake.findFirst({
+      where: {
+        user_id: userId,
+        user_supplement_id: userSupplementId,
+        taken_at: { gte: startOfDay(now), lte: endOfDay(now) },
+      },
+      orderBy: { taken_at: 'desc' },
+    });
+    if (!last) {
+      throw new BadRequestException('No hay tomas de hoy que deshacer');
+    }
+
+    await this.prisma.intake.delete({ where: { id: last.id } });
+    if (userSupplement.stock_units !== null) {
+      await this.prisma.user_supplement.update({
+        where: { id: userSupplement.id },
+        data: { stock_units: userSupplement.stock_units + userSupplement.units_per_intake },
+      });
+    }
+
+    this.logger.log(`Intake undone: ${last.id} for user ${userId}, supplement ${userSupplementId}`);
+    return { undone: true, intakeId: last.id };
+  }
+
   async findAll(
     userId: number,
     startDate?: string,

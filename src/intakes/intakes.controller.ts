@@ -11,7 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { IntakesService } from './intakes.service';
-import { CreateIntakeDto } from './dto/create-intake.dto';
+import { CreateIntakeDto, UndoIntakeDto } from './dto/create-intake.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 
@@ -32,6 +32,15 @@ export class IntakesController {
   async create(@Request() req, @Body() createIntakeDto: CreateIntakeDto) {
     this.logger.log(`Recording intake for user ID: ${req.user.id}`);
     return this.intakesService.create(req.user.id, createIntakeDto);
+  }
+
+  @Post('undo')
+  @ApiOperation({ summary: 'Deshace la última toma de hoy de un suplemento' })
+  @ApiResponse({ status: 201, description: 'Toma eliminada' })
+  @ApiResponse({ status: 400, description: 'No hay tomas de hoy que deshacer' })
+  async undo(@Request() req, @Body() dto: UndoIntakeDto) {
+    this.logger.log(`Undoing intake for user ID: ${req.user.id}`);
+    return this.intakesService.undoLast(req.user.id, dto.userSupplementId);
   }
 
   @Get()

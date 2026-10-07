@@ -12,7 +12,7 @@ export const PRO_TRIAL_DAYS = 7;
 
 export const PRO_FEATURES = [
   { code: 'stock', icon: '📦', title: 'Control de stock', description: 'Te avisa antes de que se te acabe un suplemento.' },
-  { code: 'stats', icon: '📊', title: 'Estadísticas avanzadas', description: 'Calendario de cumplimiento, gráficos y mejores días.' },
+  { code: 'stats', icon: '📊', title: 'Estadísticas avanzadas', description: 'Gráficos, mejores días y cumplimiento por suplemento.' },
   { code: 'pdf', icon: '📄', title: 'Informe en PDF', description: 'Para tu médico o nutricionista.' },
   { code: 'points', icon: '💎', title: 'Puntos x1,5', description: 'Más puntos por cada día completo y objetivo semanal.' },
   { code: 'protector', icon: '🛡️', title: 'Protector gratis cada mes', description: 'Tu racha, siempre a salvo.' },

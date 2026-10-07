@@ -17,6 +17,7 @@ import { RewardsModule } from './rewards/rewards.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { MailModule } from './mail/mail.service';
 import { StatsModule } from './stats/stats.module';
+import { CalendarModule } from './calendar/calendar.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { StatsModule } from './stats/stats.module';
     NotificationsModule,
     RewardsModule,
     StatsModule,
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [

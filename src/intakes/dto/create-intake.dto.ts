@@ -17,3 +17,9 @@ export class CreateIntakeDto {
   @IsDateString()
   takenAt?: string;
 }
+
+export class UndoIntakeDto {
+  @ApiProperty({ example: 1, description: 'User supplement ID' })
+  @IsInt()
+  userSupplementId: number;
+}
