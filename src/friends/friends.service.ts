@@ -31,7 +31,13 @@ export class FriendsService {
     });
 
     if (!targetUser) {
-      this.logger.warn(`User not found with identifier: ${identifier}`);
+      this.logger.warn(`Friend request from user ${userId}: target not found`);
+      // Con un email no se confirma si existe cuenta: así no se puede usar este
+      // endpoint para averiguar quién está registrado. Con un nombre de usuario
+      // sí se avisa (es un dato público dentro de la app y evita erratas).
+      if (identifier.includes('@')) {
+        return { message: 'Friend request sent' };
+      }
       throw new NotFoundException('User not found');
     }
 
@@ -86,14 +92,12 @@ export class FriendsService {
           select: {
             id: true,
             username: true,
-            email: true,
           },
         },
         receiver: {
           select: {
             id: true,
             username: true,
-            email: true,
           },
         },
       },
@@ -111,10 +115,10 @@ export class FriendsService {
       where: { id: requestId },
       include: {
         requester: {
-          select: { id: true, username: true, email: true },
+          select: { id: true, username: true },
         },
         receiver: {
-          select: { id: true, username: true, email: true },
+          select: { id: true, username: true },
         },
       },
     });
@@ -142,10 +146,10 @@ export class FriendsService {
       data: { status: 'accepted' },
       include: {
         requester: {
-          select: { id: true, username: true, email: true },
+          select: { id: true, username: true },
         },
         receiver: {
-          select: { id: true, username: true, email: true },
+          select: { id: true, username: true },
         },
       },
     });
@@ -196,7 +200,6 @@ export class FriendsService {
           select: {
             id: true,
             username: true,
-            email: true,
             created_at: true,
           },
         },
@@ -204,7 +207,6 @@ export class FriendsService {
           select: {
             id: true,
             username: true,
-            email: true,
             created_at: true,
           },
         },
@@ -264,7 +266,6 @@ export class FriendsService {
           select: {
             id: true,
             username: true,
-            email: true,
             created_at: true,
           },
         },

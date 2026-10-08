@@ -34,9 +34,8 @@ export class FriendsController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async sendRequest(@Request() req, @Body() dto: FriendRequestDto) {
-    this.logger.log(
-      `Friend request from user ID ${req.user.id} to ${dto.identifier}`,
-    );
+    // Sin el destinatario: puede ser un email (dato personal)
+    this.logger.log(`Friend request from user ID ${req.user.id}`);
     return this.friendsService.sendRequest(req.user.id, dto.identifier);
   }
 

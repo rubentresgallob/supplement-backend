@@ -5,6 +5,7 @@ const make = (opts: { friends: boolean; sharing: boolean }) => {
   const prisma = {
     friendship: { findFirst: jest.fn().mockResolvedValue(opts.friends ? { id: 1 } : null) },
     user: {
+      findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue({
         id: 2,
         username: 'laura',
@@ -83,6 +84,20 @@ describe('calendario de un amigo', () => {
       response: { code: 'SHARING_DISABLED' },
     });
     expect(calendar.getMonth).not.toHaveBeenCalled();
+  });
+});
+
+describe('solicitud de amistad a alguien que no existe', () => {
+  it('con un email no revela si hay cuenta: responde como si se hubiera enviado', async () => {
+    const { service } = make({ friends: false, sharing: true });
+    await expect(service.sendRequest(1, 'nadie@example.com')).resolves.toEqual({
+      message: 'Friend request sent',
+    });
+  });
+
+  it('con un nombre de usuario sí avisa de que no existe', async () => {
+    const { service } = make({ friends: false, sharing: true });
+    await expect(service.sendRequest(1, 'nadie')).rejects.toThrow('User not found');
   });
 });
 

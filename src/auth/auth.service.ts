@@ -59,12 +59,12 @@ export class AuthService {
 
     const byEmail = await this.prisma.user.findUnique({ where: { email } });
     if (byEmail?.email_verified) {
-      this.logger.warn(`Registration failed: Email already exists - ${email}`);
+      this.logger.warn('Registration failed: email already exists');
       throw new ConflictException('Email already exists');
     }
     const byUsername = await this.prisma.user.findUnique({ where: { username } });
     if (byUsername && byUsername.id !== byEmail?.id) {
-      this.logger.warn(`Registration failed: Username already exists - ${username}`);
+      this.logger.warn('Registration failed: username already exists');
       throw new ConflictException('Username already exists');
     }
 
@@ -99,14 +99,14 @@ export class AuthService {
     });
 
     if (!user) {
-      this.logger.warn(`Login failed: User not found - ${email}`);
+      this.logger.warn('Login failed: user not found');
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      this.logger.warn(`Login failed: Invalid password - ${email}`);
+      this.logger.warn(`Login failed: invalid password for user ${user.id}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -309,6 +309,116 @@ export class AuthService {
     });
     this.logger.log(`Contraseña restablecida: usuario ${user.id}`);
     return this.session(updated);
+  }
+
+  /**
+   * Todos los datos del usuario en un formato estructurado (JSON), para que
+   * pueda llevárselos (derecho de portabilidad). No incluye la contraseña ni
+   * los códigos de verificación, y de sus amigos solo el nombre de usuario.
+   */
+  async exportData(userId: number) {
+    const [user, supplements, intakes, friendships, points, items, freezes, notifications] =
+      await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            email: true,
+            username: true,
+            created_at: true,
+            consent_at: true,
+            email_verified: true,
+            points: true,
+            pro_until: true,
+            pro_source: true,
+            share_with_friends: true,
+          },
+        }),
+        this.prisma.user_supplement.findMany({
+          where: { user_id: userId },
+          include: { supplement_database: { select: { name: true } } },
+          orderBy: { created_at: 'asc' },
+        }),
+        this.prisma.intake.findMany({
+          where: { user_id: userId },
+          select: { user_supplement_id: true, taken_at: true },
+          orderBy: { taken_at: 'asc' },
+        }),
+        this.prisma.friendship.findMany({
+          where: { OR: [{ requester_id: userId }, { receiver_id: userId }] },
+          include: {
+            requester: { select: { id: true, username: true } },
+            receiver: { select: { id: true, username: true } },
+          },
+        }),
+        this.prisma.points_transaction.findMany({
+          where: { user_id: userId },
+          select: { amount: true, reason: true, created_at: true },
+          orderBy: { created_at: 'asc' },
+        }),
+        this.prisma.user_item.findMany({
+          where: { user_id: userId },
+          select: { item_code: true, quantity: true, equipped: true, acquired_at: true },
+        }),
+        this.prisma.streak_freeze.findMany({
+          where: { user_id: userId },
+          select: { day: true },
+          orderBy: { day: 'asc' },
+        }),
+        this.prisma.notification_config.findUnique({ where: { user_id: userId } }),
+      ]);
+    if (!user) throw new UnauthorizedException();
+
+    const names = new Map(
+      supplements.map((s) => [s.id, s.supplement_database?.name ?? s.custom_name ?? 'Suplemento']),
+    );
+
+    return {
+      exportedAt: new Date().toISOString(),
+      account: {
+        email: user.email,
+        username: user.username,
+        createdAt: user.created_at,
+        acceptedTermsAt: user.consent_at,
+        emailVerified: user.email_verified,
+        shareWithFriends: user.share_with_friends,
+        pro: { until: user.pro_until, source: user.pro_source },
+      },
+      supplements: supplements.map((s) => ({
+        name: names.get(s.id),
+        form: s.form,
+        dosageAmount: s.dosage_amount,
+        dosageUnit: s.dosage_unit,
+        timesPerDay: s.times_per_day,
+        schedules: s.schedules,
+        addedAt: s.created_at,
+        removedAt: s.deleted_at,
+        stockUnits: s.stock_units,
+      })),
+      intakes: intakes.map((i) => ({
+        supplement: names.get(i.user_supplement_id) ?? 'Suplemento',
+        takenAt: i.taken_at,
+      })),
+      friends: friendships.map((f) => ({
+        username: f.requester_id === userId ? f.receiver.username : f.requester.username,
+        status: f.status,
+        requestedByMe: f.requester_id === userId,
+        since: f.created_at,
+      })),
+      points: {
+        balance: user.points,
+        history: points.map((p) => ({ amount: p.amount, reason: p.reason, at: p.created_at })),
+      },
+      items: items.map((i) => ({
+        code: i.item_code,
+        quantity: i.quantity,
+        equipped: i.equipped,
+        acquiredAt: i.acquired_at,
+      })),
+      streakProtectedDays: freezes.map((f) => f.day),
+      notifications: notifications
+        ? { enabled: notifications.global_enabled, config: notifications.supplement_configs }
+        : null,
+    };
   }
 
   async getProfile(userId: number) {

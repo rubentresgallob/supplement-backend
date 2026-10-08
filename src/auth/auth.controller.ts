@@ -8,7 +8,6 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
-  Req,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -20,7 +19,6 @@ import {
   VerifyEmailDto,
 } from './dto/password-reset.dto';
 import { Throttle } from '@nestjs/throttler';
-import { clientIp } from '../common/client-ip';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -38,10 +36,11 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'Cuenta creada; falta verificar el email (no devuelve sesión)' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 409, description: 'User already exists' })
-  async register(@Body() registerDto: RegisterDto, @Req() req) {
-    this.logger.log(`Registration attempt for email: ${registerDto.email} (IP ${clientIp(req)})`);
+  async register(@Body() registerDto: RegisterDto) {
+    // Sin email ni IP en los logs (datos personales)
+    this.logger.log('Registration attempt');
     const result = await this.authService.register(registerDto);
-    this.logger.log(`User registered successfully: ${registerDto.email}`);
+    this.logger.log('User registered successfully');
     return result;
   }
 
@@ -53,9 +52,8 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @ApiResponse({ status: 403, description: 'EMAIL_NOT_VERIFIED: se reenvía el código' })
   async login(@Body() loginDto: LoginDto) {
-    this.logger.log(`Login attempt for email: ${loginDto.email}`);
     const result = await this.authService.login(loginDto);
-    this.logger.log(`User logged in successfully: ${loginDto.email}`);
+    this.logger.log(`User logged in successfully: ID ${result.user?.id ?? '?'}`);
     return result;
   }
 
@@ -86,6 +84,16 @@ export class AuthController {
   async getProfile(@Request() req) {
     this.logger.log(`Profile request for user ID: ${req.user.id}`);
     return this.authService.getProfile(req.user.id);
+  }
+
+  @Get('export')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
+  @ApiOperation({ summary: 'Descargar todos mis datos (portabilidad, art. 20 RGPD)' })
+  async exportData(@Request() req) {
+    this.logger.log(`Data export for user ID: ${req.user.id}`);
+    return this.authService.exportData(req.user.id);
   }
 
   @Post('delete-account')
