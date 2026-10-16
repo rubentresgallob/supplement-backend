@@ -8,7 +8,6 @@
 --   npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script
 
 BEGIN;
-BEGIN;
 
 -- AlterTable
 ALTER TABLE "user" ADD COLUMN     "age_confirmed_at" TIMESTAMP(3),
