@@ -36,6 +36,9 @@ model user {
   points_transactions   points_transaction[]
   items                 user_item[]
   streak_freezes        streak_freeze[]
+  push_tokens           push_token[]
+  motivations_sent      motivation[]         @relation("MotivationSender")
+  motivations_received  motivation[]         @relation("MotivationReceiver")
 }
 
 model supplement_database {
@@ -164,4 +167,31 @@ model streak_freeze {
 
   @@unique([user_id, day])
   @@index([user_id])
+}
+
+// Token de Firebase Cloud Messaging de cada móvil con la sesión iniciada (push reales)
+model push_token {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  token      String   @unique
+  platform   String // android · ios
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+// "Motivar" a un amigo: uno al día por pareja (para que no se convierta en spam)
+model motivation {
+  id          Int      @id @default(autoincrement())
+  sender_id   Int
+  receiver_id Int
+  created_at  DateTime @default(now())
+
+  sender   user @relation("MotivationSender", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver user @relation("MotivationReceiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@index([sender_id, receiver_id, created_at])
 }

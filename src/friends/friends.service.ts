@@ -3,12 +3,15 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StreaksService } from '../streaks/streaks.service';
 import { RewardsService } from '../rewards/rewards.service';
 import { CalendarService } from '../calendar/calendar.service';
+import { PushService } from '../push/push.service';
 import { startOfDay, endOfDay } from 'date-fns';
 
 @Injectable()
@@ -20,6 +23,7 @@ export class FriendsService {
     private streaksService: StreaksService,
     private rewardsService: RewardsService,
     private calendarService: CalendarService,
+    private pushService: PushService,
   ) {}
 
   async sendRequest(userId: number, identifier: string) {
@@ -468,4 +472,65 @@ export class FriendsService {
     }
     return this.calendarService.getMonth(friendId, year, month);
   }
+
+  // ── Motivar ───────────────────────────────────────────────────────────────
+
+  /**
+   * Manda un aviso push al amigo. Si le falta algo por tomar hoy, le recuerda
+   * ese suplemento ("¡Alex dice que no te olvides de tu creatina!").
+   * Uno al día por pareja. `delivered` = si le ha llegado a algún móvil.
+   * Al que motiva NO se le dice qué suplemento le falta al otro.
+   */
+  async motivate(userId: number, friendId: number) {
+    await this.assertFriends(userId, friendId);
+    const now = new Date();
+    const already = await this.prisma.motivation.findFirst({
+      where: { sender_id: userId, receiver_id: friendId, created_at: { gte: startOfDay(now) } },
+      select: { id: true },
+    });
+    if (already) {
+      throw new HttpException(
+        { message: 'Ya le has motivado hoy. Vuelve a intentarlo mañana', code: 'ALREADY_MOTIVATED' },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const [sender, today] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId }, select: { username: true } }),
+      this.todayOf(friendId),
+    ]);
+    await this.prisma.motivation.create({ data: { sender_id: userId, receiver_id: friendId } });
+
+    const pending = today.supplements.find((s) => s.taken < s.expected);
+    const delivered = await this.pushService.sendToUser(
+      friendId,
+      motivationMessage(sender?.username ?? 'Un amigo', pending?.name ?? null, today.complete),
+    );
+    this.logger.log(`Usuario ${userId} motiva a ${friendId} (entregado: ${delivered > 0})`);
+    return { sent: true, delivered: delivered > 0 };
+  }
+}
+
+/** "Creatina" → "creatina", pero "ZMA" o "BCAA" se quedan igual. */
+export function lowerFirst(name: string) {
+  if (name.length > 1 && name[1] === name[1].toUpperCase() && name[1] !== name[1].toLowerCase()) {
+    return name;
+  }
+  return name.charAt(0).toLowerCase() + name.slice(1);
+}
+
+/** Texto del aviso de "Motivar". */
+export function motivationMessage(sender: string, pendingSupplement: string | null, dayComplete: boolean) {
+  if (pendingSupplement) {
+    return {
+      title: `¡${sender} dice que no te olvides de tu ${lowerFirst(pendingSupplement)}!`,
+      body: 'Toca para registrar la toma de hoy',
+      data: { type: 'motivation' },
+    };
+  }
+  return {
+    title: `${sender} te manda ánimos 💪`,
+    body: dayComplete ? 'Hoy ya lo tienes todo. ¡Sigue así!' : '¡A por el día de hoy!',
+    data: { type: 'motivation' },
+  };
 }

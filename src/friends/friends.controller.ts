@@ -141,6 +141,14 @@ export class FriendsController {
     return this.friendsService.getFriendProfile(req.user.id, friendId);
   }
 
+  @Post(':friendId/motivate')
+  @ApiOperation({ summary: 'Motivar a un amigo: le llega una notificación push (1 al día)' })
+  @ApiResponse({ status: 403, description: 'No sois amigos' })
+  @ApiResponse({ status: 429, description: 'Ya le has motivado hoy' })
+  motivate(@Request() req, @Param('friendId', ParseIntPipe) friendId: number) {
+    return this.friendsService.motivate(req.user.id, friendId);
+  }
+
   @Get(':friendId/calendar')
   @ApiOperation({ summary: 'Calendario mensual de un amigo (si lo comparte)' })
   @ApiResponse({ status: 403, description: 'No sois amigos, o SHARING_DISABLED' })

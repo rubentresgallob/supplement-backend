@@ -1,7 +1,7 @@
-import { FriendsService } from './friends.service';
+import { FriendsService, lowerFirst, motivationMessage } from './friends.service';
 
 /** Servicio con una BD simulada: `friends` = ¿son amigos?, `sharing` = ¿el amigo comparte? */
-const make = (opts: { friends: boolean; sharing: boolean }) => {
+const make = (opts: { friends: boolean; sharing: boolean; motivatedToday?: boolean }) => {
   const prisma = {
     friendship: { findFirst: jest.fn().mockResolvedValue(opts.friends ? { id: 1 } : null) },
     user: {
@@ -30,13 +30,18 @@ const make = (opts: { friends: boolean; sharing: boolean }) => {
       ]),
     },
     intake: { count: jest.fn().mockResolvedValue(30) },
+    motivation: {
+      findFirst: jest.fn().mockResolvedValue(opts.motivatedToday ? { id: 1 } : null),
+      create: jest.fn().mockResolvedValue({}),
+    },
   };
   const streaks = { getUserStreak: jest.fn().mockResolvedValue({ current_streak: 4, longest_streak: 9 }) };
   const rewards = { getEquippedFor: jest.fn().mockResolvedValue(new Map([[2, { capsu_head: 'capsu_head_cap' }]])) };
   const calendar = { getMonth: jest.fn().mockResolvedValue({ month: '2026-10', days: [] }) };
+  const push = { sendToUser: jest.fn().mockResolvedValue(1) };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const service = new FriendsService(prisma as any, streaks as any, rewards as any, calendar as any);
-  return { service, prisma, calendar };
+  const service = new FriendsService(prisma as any, streaks as any, rewards as any, calendar as any, push as any);
+  return { service, prisma, calendar, push };
 };
 
 describe('perfil de un amigo', () => {
@@ -106,5 +111,44 @@ describe('compartir con amigos', () => {
     const { service, prisma } = make({ friends: true, sharing: true });
     await expect(service.setSharing(1, false)).resolves.toEqual({ enabled: false });
     expect(prisma.user.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { share_with_friends: false } });
+  });
+});
+
+describe('motivar a un amigo', () => {
+  it('le manda un push recordándole lo que le falta hoy', async () => {
+    const { service, push, prisma } = make({ friends: true, sharing: true });
+    const result = await service.motivate(1, 2);
+    expect(result).toEqual({ sent: true, delivered: true });
+    expect(prisma.motivation.create).toHaveBeenCalled();
+    expect(push.sendToUser).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ title: '¡laura dice que no te olvides de tu creatina!' }),
+    );
+  });
+
+  it('solo una vez al día por amigo (429)', async () => {
+    const { service, push } = make({ friends: true, sharing: true, motivatedToday: true });
+    await expect(service.motivate(1, 2)).rejects.toMatchObject({ status: 429 });
+    expect(push.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('a quien no es amigo, no (403)', async () => {
+    const { service, push } = make({ friends: false, sharing: true });
+    await expect(service.motivate(1, 2)).rejects.toMatchObject({ status: 403 });
+    expect(push.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('si ya lo ha tomado todo, solo ánimos', () => {
+    expect(motivationMessage('alex', null, true)).toMatchObject({
+      title: 'alex te manda ánimos 💪',
+      body: 'Hoy ya lo tienes todo. ¡Sigue así!',
+    });
+  });
+
+  it('nombres en minúscula salvo siglas', () => {
+    expect(lowerFirst('Creatina')).toBe('creatina');
+    expect(lowerFirst('Vitamina D')).toBe('vitamina D');
+    expect(lowerFirst('ZMA')).toBe('ZMA');
+    expect(lowerFirst('BCAA')).toBe('BCAA');
   });
 });

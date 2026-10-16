@@ -18,12 +18,14 @@ import { SubscriptionModule } from './subscription/subscription.module';
 import { MailModule } from './mail/mail.service';
 import { StatsModule } from './stats/stats.module';
 import { CalendarModule } from './calendar/calendar.module';
+import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
     PrismaModule,
     SubscriptionModule,
     MailModule,
+    PushModule,
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 60,
