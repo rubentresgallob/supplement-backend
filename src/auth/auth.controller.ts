@@ -13,6 +13,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { LegalAcceptanceDto } from './dto/register.dto';
 import {
   ForgotPasswordDto,
   ResetPasswordDto,
@@ -84,6 +85,16 @@ export class AuthController {
   async getProfile(@Request() req) {
     this.logger.log(`Profile request for user ID: ${req.user.id}`);
     return this.authService.getProfile(req.user.id);
+  }
+
+  @Post('accept-legal')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Aceptar la versión vigente de los Términos y la Política (reaceptación)' })
+  // El DTO valida las tres casillas aunque aquí no se use su contenido
+  async acceptLegal(@Request() req, @Body() _dto: LegalAcceptanceDto) {
+    return this.authService.acceptLegal(req.user.id);
   }
 
   @Get('export')

@@ -20,7 +20,14 @@ model user {
   reset_expires    DateTime?
   reset_attempts   Int       @default(0)
   share_with_friends Boolean @default(true) // Sus amigos ven su stack, lo que toma hoy y su calendario
-  consent_at       DateTime? // RGPD: cuándo aceptó términos, privacidad y el tratamiento de datos de salud
+  consent_at       DateTime? // (antiguo) casilla única del registro anterior; ver los campos de abajo
+  // RGPD: cada aceptación por separado, con fecha y versión del texto (src/legal/legal.ts)
+  age_confirmed_at    DateTime? // "Tengo 18 años o más"
+  terms_accepted_at   DateTime?
+  terms_version       String?
+  privacy_accepted_at DateTime?
+  privacy_version     String?
+  health_consent_at   DateTime? // Consentimiento explícito para datos de salud (art. 9 RGPD)
   email_verified   Boolean   @default(false) // Sin verificar no puede iniciar sesión; se borra a las 24 h
   verify_code_hash String? // Verificar email: código de 6 cifras (hasheado)
   verify_sent_at   DateTime? // Cuándo se envió el último código (para no reenviar en bucle)

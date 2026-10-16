@@ -15,6 +15,7 @@ import { randomInt } from 'crypto';
 import { addMinutes, addMonths, startOfMonth, subHours, subSeconds } from 'date-fns';
 import { MailService } from '../mail/mail.service';
 import { isProEnabled } from '../subscription/pro-plan';
+import { acceptanceData, legalStatus } from '../legal/legal';
 import { CalendarService } from '../calendar/calendar.service';
 import { StreaksService } from '../streaks/streaks.service';
 
@@ -41,7 +42,16 @@ export function isVerifyCodeValid(sentAt: Date | null, now = new Date()) {
   return !!sentAt && addMinutes(sentAt, VERIFY_CODE_MINUTES) > now;
 }
 
-type SessionUser = { id: number; email: string; username: string; created_at: Date };
+type SessionUser = {
+  id: number;
+  email: string;
+  username: string;
+  created_at: Date;
+  terms_version: string | null;
+  privacy_version: string | null;
+  age_confirmed_at: Date | null;
+  health_consent_at: Date | null;
+};
 
 @Injectable()
 export class AuthService {
@@ -83,7 +93,7 @@ export class AuthService {
       email,
       password: await bcrypt.hash(password, 10),
       username,
-      consent_at: registerDto.acceptTerms ? new Date() : null,
+      ...acceptanceData(), // el DTO exige las tres casillas marcadas
     };
     const user = byEmail
       ? await this.prisma.user.update({ where: { id: byEmail.id }, data })
@@ -258,8 +268,19 @@ export class AuthService {
         email: user.email,
         username: user.username,
         created_at: user.created_at,
+        legal: legalStatus(user),
       },
     };
+  }
+
+  /** Reaceptación: guarda las tres aceptaciones con la versión vigente. */
+  async acceptLegal(userId: number) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: acceptanceData(),
+    });
+    this.logger.log(`Textos legales aceptados: usuario ${userId}`);
+    return legalStatus(user);
   }
 
   /**
@@ -359,6 +380,12 @@ export class AuthService {
             username: true,
             created_at: true,
             consent_at: true,
+            age_confirmed_at: true,
+            terms_accepted_at: true,
+            terms_version: true,
+            privacy_accepted_at: true,
+            privacy_version: true,
+            health_consent_at: true,
             email_verified: true,
             points: true,
             pro_until: true,
@@ -421,7 +448,13 @@ export class AuthService {
         email: user.email,
         username: user.username,
         createdAt: user.created_at,
-        acceptedTermsAt: user.consent_at,
+        consents: {
+          ageConfirmedAt: user.age_confirmed_at,
+          terms: { acceptedAt: user.terms_accepted_at, version: user.terms_version },
+          privacy: { acceptedAt: user.privacy_accepted_at, version: user.privacy_version },
+          healthDataConsentAt: user.health_consent_at,
+          legacyConsentAt: user.consent_at,
+        },
         emailVerified: user.email_verified,
         shareWithFriends: user.share_with_friends,
         ...(isProEnabled() ? { pro: { until: user.pro_until, source: user.pro_source } } : {}),
@@ -475,10 +508,18 @@ export class AuthService {
         username: true,
         created_at: true,
         updated_at: true,
+        terms_version: true,
+        privacy_version: true,
+        age_confirmed_at: true,
+        health_consent_at: true,
       },
     });
-
-    return user;
+    if (!user) throw new UnauthorizedException();
+    const { terms_version, privacy_version, age_confirmed_at, health_consent_at, ...rest } = user;
+    return {
+      ...rest,
+      legal: legalStatus({ terms_version, privacy_version, age_confirmed_at, health_consent_at }),
+    };
   }
 
   async validateUser(email: string, password: string): Promise<any> {
