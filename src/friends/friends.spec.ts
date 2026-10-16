@@ -1,4 +1,4 @@
-import { FriendsService, lowerFirst, motivationMessage } from './friends.service';
+import { FRIEND_REQUEST_GENERIC, FriendsService, lowerFirst, motivationMessage } from './friends.service';
 
 /** Servicio con una BD simulada: `friends` = ¿son amigos?, `sharing` = ¿el amigo comparte? */
 const make = (opts: { friends: boolean; sharing: boolean; motivatedToday?: boolean }) => {
@@ -93,16 +93,13 @@ describe('calendario de un amigo', () => {
 });
 
 describe('solicitud de amistad a alguien que no existe', () => {
-  it('con un email no revela si hay cuenta: responde como si se hubiera enviado', async () => {
+  it('con email o con nombre de usuario responde lo mismo que si existiera', async () => {
     const { service } = make({ friends: false, sharing: true });
-    await expect(service.sendRequest(1, 'nadie@example.com')).resolves.toEqual({
-      message: 'Friend request sent',
-    });
-  });
-
-  it('con un nombre de usuario sí avisa de que no existe', async () => {
-    const { service } = make({ friends: false, sharing: true });
-    await expect(service.sendRequest(1, 'nadie')).rejects.toThrow('User not found');
+    for (const id of ['nadie@example.com', 'nadie']) {
+      await expect(service.sendRequest(1, id)).resolves.toEqual({
+        message: FRIEND_REQUEST_GENERIC,
+      });
+    }
   });
 });
 

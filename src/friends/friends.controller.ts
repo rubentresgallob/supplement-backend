@@ -31,7 +31,6 @@ export class FriendsController {
   @ApiOperation({ summary: 'Send friend request by username or email' })
   @ApiResponse({ status: 201, description: 'Friend request sent successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async sendRequest(@Request() req, @Body() dto: FriendRequestDto) {
     // Sin el destinatario: puede ser un email (dato personal)

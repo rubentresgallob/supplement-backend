@@ -4,6 +4,8 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { HttpAdapterHost } from '@nestjs/core';
+import { requestLog, SafeExceptionFilter } from './common/safe-logging';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -30,6 +32,10 @@ async function bootstrap() {
     credentials: true,
   });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  // Logs sin datos personales (ver common/safe-logging.ts)
+  app.use(requestLog);
+  app.useGlobalFilters(new SafeExceptionFilter(app.get(HttpAdapterHost).httpAdapter));
 
   // Swagger configuration
   const swaggerPath = 'api';

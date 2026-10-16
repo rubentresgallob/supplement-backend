@@ -12,11 +12,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { randomInt } from 'crypto';
-import { addMinutes, subHours, subSeconds } from 'date-fns';
+import { addMinutes, addMonths, startOfMonth, subHours, subSeconds } from 'date-fns';
 import { MailService } from '../mail/mail.service';
 import { isProEnabled } from '../subscription/pro-plan';
+import { CalendarService } from '../calendar/calendar.service';
+import { StreaksService } from '../streaks/streaks.service';
 
 /** Recuperar contraseña: validez del código y máximo de intentos. */
+/** Nombre de la app en los emails. */
+export const APP_NAME = 'Supplement Tracker';
+
 export const RESET_CODE_MINUTES = 15;
 export const RESET_MAX_ATTEMPTS = 5;
 
@@ -46,6 +51,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private mailService: MailService,
+    private calendarService: CalendarService,
+    private streaksService: StreaksService,
   ) {}
 
   /**
@@ -60,8 +67,11 @@ export class AuthService {
 
     const byEmail = await this.prisma.user.findUnique({ where: { email } });
     if (byEmail?.email_verified) {
-      this.logger.warn('Registration failed: email already exists');
-      throw new ConflictException('Email already exists');
+      // No se revela que el email ya tiene cuenta: se responde igual que a un registro
+      // nuevo y al dueño del email le llega un aviso para que inicie sesión.
+      await this.sendAlreadyRegisteredNotice(byEmail);
+      this.logger.log(`Registro con un email ya verificado: usuario ${byEmail.id}`);
+      return this.pendingVerification(email);
     }
     const byUsername = await this.prisma.user.findUnique({ where: { username } });
     if (byUsername && byUsername.id !== byEmail?.id) {
@@ -129,9 +139,8 @@ export class AuthService {
     const invalid = new BadRequestException('Código no válido o caducado');
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw invalid;
-    if (user.email_verified) {
-      throw new BadRequestException('Este email ya está verificado. Inicia sesión');
-    }
+    // Ya verificado: el mismo error que un código malo (no revela si la cuenta existe)
+    if (user.email_verified) throw invalid;
     if (!user.verify_code_hash || !isVerifyCodeValid(user.verify_sent_at)) throw invalid;
     if (user.verify_attempts >= VERIFY_MAX_ATTEMPTS) {
       throw new BadRequestException('Demasiados intentos. Pide un código nuevo');
@@ -193,7 +202,7 @@ export class AuthService {
         <p>Hola ${user.username}, este es tu código para activar tu cuenta:</p>
         <p style="font-size:32px;font-weight:800;letter-spacing:6px">${code}</p>
         <p>Caduca en ${VERIFY_CODE_MINUTES} minutos. Si no te has registrado tú, ignora este email.</p>
-        <p style="color:#888">Suplementos Tracker</p>
+        <p style="color:#888">${APP_NAME}</p>
       </div>`,
       `Tu código para verificar tu email es ${code}. Caduca en ${VERIFY_CODE_MINUTES} minutos.`,
     );
@@ -205,6 +214,29 @@ export class AuthService {
         verify_attempts: 0,
       },
     });
+  }
+
+  /** Aviso al dueño de un email ya registrado (máx. 1 por minuto, como los códigos). */
+  private async sendAlreadyRegisteredNotice(user: {
+    id: number;
+    email: string;
+    username: string;
+    verify_sent_at: Date | null;
+  }) {
+    if (!canResendVerification(user.verify_sent_at)) return;
+    await this.mailService.send(
+      user.email,
+      'Ya tienes una cuenta',
+      `<div style="font-family:system-ui,sans-serif;max-width:420px">
+        <h2>Ya tienes una cuenta</h2>
+        <p>Hola ${user.username}, alguien (quizá tú) ha intentado crear una cuenta nueva con este email.</p>
+        <p>Si fuiste tú, inicia sesión en la app. Si no recuerdas la contraseña, usa «¿Olvidaste tu contraseña?».</p>
+        <p>Si no fuiste tú, ignora este email: tu cuenta sigue igual.</p>
+        <p style="color:#888">${APP_NAME}</p>
+      </div>`,
+      'Alguien ha intentado crear una cuenta con este email, que ya está registrado. Si fuiste tú, inicia sesión o recupera tu contraseña. Si no, ignora este email.',
+    );
+    await this.prisma.user.update({ where: { id: user.id }, data: { verify_sent_at: new Date() } });
   }
 
   /** Borra las cuentas que nadie verificó a tiempo (y libera su email y nombre). */
@@ -272,7 +304,7 @@ export class AuthService {
         <p>Hola ${user.username}, este es tu código para crear una contraseña nueva:</p>
         <p style="font-size:32px;font-weight:800;letter-spacing:6px">${code}</p>
         <p>Caduca en ${RESET_CODE_MINUTES} minutos. Si no lo has pedido tú, ignora este email.</p>
-        <p style="color:#888">Suplementos Tracker</p>
+        <p style="color:#888">${APP_NAME}</p>
       </div>`,
       `Tu código para recuperar la contraseña es ${code}. Caduca en ${RESET_CODE_MINUTES} minutos.`,
     );
@@ -369,6 +401,16 @@ export class AuthService {
       ]);
     if (!user) throw new UnauthorizedException();
 
+    // Calendario mes a mes desde el primer suplemento, y la racha
+    const calendar: unknown[] = [];
+    if (supplements.length) {
+      const last = startOfMonth(new Date());
+      for (let m = startOfMonth(supplements[0].created_at); m <= last; m = addMonths(m, 1)) {
+        calendar.push(await this.calendarService.getMonth(userId, m.getFullYear(), m.getMonth() + 1));
+      }
+    }
+    const streak = await this.streaksService.getUserStreak(userId);
+
     const names = new Map(
       supplements.map((s) => [s.id, s.supplement_database?.name ?? s.custom_name ?? 'Suplemento']),
     );
@@ -415,6 +457,8 @@ export class AuthService {
         equipped: i.equipped,
         acquiredAt: i.acquired_at,
       })),
+      streak,
+      calendar,
       streakProtectedDays: freezes.map((f) => f.day),
       notifications: notifications
         ? { enabled: notifications.global_enabled, config: notifications.supplement_configs }

@@ -64,8 +64,6 @@ export class SupplementsService {
       orderBy: { name: 'asc' },
     });
 
-    this.logger.log(`Found ${supplements.length} supplements for query: ${query}`);
-
     return {
       data: supplements,
       count: supplements.length,

@@ -36,7 +36,6 @@ export class SupplementsController {
   @ApiQuery({ name: 'q', required: true, example: 'Vitamina', description: 'Search query' })
   @ApiResponse({ status: 200, description: 'List of matching supplements' })
   async search(@Query('q') query: string) {
-    this.logger.log(`Searching supplements with query: ${query}`);
     return this.supplementsService.search(query);
   }
 

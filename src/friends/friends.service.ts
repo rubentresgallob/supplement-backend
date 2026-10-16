@@ -14,6 +14,9 @@ import { CalendarService } from '../calendar/calendar.service';
 import { PushService } from '../push/push.service';
 import { startOfDay, endOfDay } from 'date-fns';
 
+/** Respuesta única al enviar una solicitud (no revela si la cuenta existe). */
+export const FRIEND_REQUEST_GENERIC = 'Si existe una cuenta con ese dato, le llegará tu solicitud';
+
 @Injectable()
 export class FriendsService {
   private readonly logger = new Logger(FriendsService.name);
@@ -26,30 +29,30 @@ export class FriendsService {
     private pushService: PushService,
   ) {}
 
+  /**
+   * Envía una solicitud por nombre de usuario o email exactos. La respuesta es
+   * SIEMPRE la misma (exista o no la cuenta, o si ya había una solicitud
+   * pendiente), para que nadie pueda usar esto para averiguar quién está registrado.
+   */
   async sendRequest(userId: number, identifier: string) {
-    // Find user by username or email
+    const generic = { message: FRIEND_REQUEST_GENERIC };
     const targetUser = await this.prisma.user.findFirst({
       where: {
+        email_verified: true,
         OR: [{ email: identifier }, { username: identifier }],
       },
+      select: { id: true },
     });
 
     if (!targetUser) {
-      this.logger.warn(`Friend request from user ${userId}: target not found`);
-      // Con un email no se confirma si existe cuenta: así no se puede usar este
-      // endpoint para averiguar quién está registrado. Con un nombre de usuario
-      // sí se avisa (es un dato público dentro de la app y evita erratas).
-      if (identifier.includes('@')) {
-        return { message: 'Friend request sent' };
-      }
-      throw new NotFoundException('User not found');
+      this.logger.log(`Solicitud de amistad del usuario ${userId}: sin destinatario`);
+      return generic;
     }
 
     if (targetUser.id === userId) {
-      throw new BadRequestException('Cannot send friend request to yourself');
+      throw new BadRequestException('No puedes enviarte una solicitud a ti mismo');
     }
 
-    // Check if friendship already exists
     const existingFriendship = await this.prisma.friendship.findFirst({
       where: {
         OR: [
@@ -59,59 +62,31 @@ export class FriendsService {
       },
     });
 
-    if (existingFriendship) {
-      if (existingFriendship.status === 'accepted') {
-        throw new BadRequestException('Already friends with this user');
+    if (existingFriendship?.status === 'accepted') {
+      // Ya son amigos: no revela nada que no sepa
+      throw new BadRequestException('Ya sois amigos');
+    }
+    if (existingFriendship?.status === 'pending') {
+      if (existingFriendship.requester_id === targetUser.id) {
+        // Él ya me la había enviado: la tengo en "Solicitudes"
+        throw new BadRequestException('Esa persona ya te ha enviado una solicitud: acéptala en Solicitudes');
       }
-      if (existingFriendship.status === 'pending') {
-        throw new BadRequestException('Friend request already pending');
-      }
-      // If rejected, allow to send again by updating
-      const updated = await this.prisma.friendship.update({
-        where: { id: existingFriendship.id },
-        data: {
-          status: 'pending',
-          requester_id: userId,
-          receiver_id: targetUser.id,
-        },
-      });
-      this.logger.log(
-        `Friend request updated: ${userId} -> ${targetUser.id}`,
-      );
-      return {
-        message: 'Friend request sent',
-        friendship: updated,
-      };
+      return generic; // ya la había enviado yo
     }
 
-    // Create new friendship request
-    const friendship = await this.prisma.friendship.create({
-      data: {
-        requester_id: userId,
-        receiver_id: targetUser.id,
-        status: 'pending',
-      },
-      include: {
-        requester: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
-      },
-    });
-
-    this.logger.log(`Friend request sent: ${userId} -> ${targetUser.id}`);
-    return {
-      message: 'Friend request sent',
-      friendship,
-    };
+    if (existingFriendship) {
+      // Rechazada antes: se puede volver a enviar
+      await this.prisma.friendship.update({
+        where: { id: existingFriendship.id },
+        data: { status: 'pending', requester_id: userId, receiver_id: targetUser.id },
+      });
+    } else {
+      await this.prisma.friendship.create({
+        data: { requester_id: userId, receiver_id: targetUser.id, status: 'pending' },
+      });
+    }
+    this.logger.log(`Solicitud de amistad: ${userId} -> ${targetUser.id}`);
+    return generic;
   }
 
   async acceptRequest(userId: number, requestId: number) {

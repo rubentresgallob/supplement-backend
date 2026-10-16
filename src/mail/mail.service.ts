@@ -32,7 +32,12 @@ export class MailService {
   async send(to: string, subject: string, html: string, text: string) {
     this.countOrRefuse();
     if (!this.isConfigured) {
-      this.logger.warn(`[SIN BREVO] Email a ${to} | ${subject} | ${text}`);
+      // Sin el destinatario. El código solo se muestra en local (nunca en producción).
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.error('[SIN BREVO] Brevo no está configurado: email no enviado');
+      } else {
+        this.logger.warn(`[SIN BREVO] ${subject} | ${text}`);
+      }
       return;
     }
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -45,7 +50,7 @@ export class MailService {
       body: JSON.stringify({
         sender: {
           email: process.env.MAIL_FROM,
-          name: process.env.MAIL_FROM_NAME ?? 'Suplementos Tracker',
+          name: process.env.MAIL_FROM_NAME ?? 'Supplement Tracker',
         },
         to: [{ email: to }],
         subject,
@@ -54,7 +59,8 @@ export class MailService {
       }),
     });
     if (!response.ok) {
-      this.logger.error(`Brevo respondió ${response.status}: ${await response.text()}`);
+      // Solo el código: la respuesta de Brevo puede repetir el email del destinatario
+      this.logger.error(`Brevo respondió ${response.status}`);
       throw new Error('No se pudo enviar el email');
     }
   }
