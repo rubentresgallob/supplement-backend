@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CATALOG_PUBLIC } from './catalog-fields';
 
 @Injectable()
 export class SupplementsService {
@@ -15,6 +16,7 @@ export class SupplementsService {
         skip,
         take: limit,
         orderBy: { name: 'asc' },
+        select: CATALOG_PUBLIC,
       }),
       this.prisma.supplement_database.count(),
     ]);
@@ -33,6 +35,7 @@ export class SupplementsService {
   async findOne(id: number) {
     const supplement = await this.prisma.supplement_database.findUnique({
       where: { id },
+      select: CATALOG_PUBLIC,
     });
 
     if (!supplement) {
@@ -62,6 +65,7 @@ export class SupplementsService {
         ],
       },
       orderBy: { name: 'asc' },
+      select: CATALOG_PUBLIC,
     });
 
     return {

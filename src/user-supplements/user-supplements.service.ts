@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserSupplementDto } from './dto/create-user-supplement.dto';
 import { UpdateUserSupplementDto } from './dto/update-user-supplement.dto';
 import { UpdateStockDto } from './dto/update-stock.dto';
+import { CATALOG_PUBLIC } from '../supplements/catalog-fields';
 
 @Injectable()
 export class UserSupplementsService {
@@ -55,7 +56,7 @@ export class UserSupplementsService {
         active: dto.active !== undefined ? dto.active : true,
       },
       include: {
-        supplement_database: true,
+        supplement_database: { select: CATALOG_PUBLIC },
       },
     });
 
@@ -70,7 +71,7 @@ export class UserSupplementsService {
       // Los retirados se conservan solo para el historial (calendario)
       where: { user_id: userId, deleted_at: null },
       include: {
-        supplement_database: true,
+        supplement_database: { select: CATALOG_PUBLIC },
       },
       orderBy: { created_at: 'desc' },
     });
@@ -82,7 +83,7 @@ export class UserSupplementsService {
     const supplement = await this.prisma.user_supplement.findUnique({
       where: { id },
       include: {
-        supplement_database: true,
+        supplement_database: { select: CATALOG_PUBLIC },
       },
     });
 
@@ -119,7 +120,7 @@ export class UserSupplementsService {
         active: dto.active,
       },
       include: {
-        supplement_database: true,
+        supplement_database: { select: CATALOG_PUBLIC },
       },
     });
 
@@ -136,7 +137,7 @@ export class UserSupplementsService {
         stock_units: dto.stockUnits,
         units_per_intake: dto.unitsPerIntake,
       },
-      include: { supplement_database: true },
+      include: { supplement_database: { select: CATALOG_PUBLIC } },
     });
   }
 

@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { startOfDay, subDays } from 'date-fns';
 import { computeStreaks, dayKey, STREAK_LOOKBACK_DAYS } from './streak-utils';
+import { CATALOG_PUBLIC } from '../supplements/catalog-fields';
 
 export interface DayStatus {
   /** Nº de suplementos activos (si es 0 no hay racha posible). */
@@ -45,7 +46,7 @@ export class StreaksService {
     const supplement = await this.prisma.user_supplement.findUnique({
       where: { id: supplementId },
       include: {
-        supplement_database: true,
+        supplement_database: { select: CATALOG_PUBLIC },
       },
     });
 

@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateIntakeDto } from './dto/create-intake.dto';
 import { startOfDay, endOfDay } from 'date-fns';
 import { RewardsService, GrantedReward } from '../rewards/rewards.service';
+import { CATALOG_PUBLIC } from '../supplements/catalog-fields';
 
 /** Antigüedad máxima de una toma registrada a posteriori (evita inventarse rachas). */
 export const MAX_INTAKE_AGE_HOURS = 48;
@@ -72,7 +73,7 @@ export class IntakesService {
       include: {
         user_supplement: {
           include: {
-            supplement_database: true,
+            supplement_database: { select: CATALOG_PUBLIC },
           },
         },
       },
@@ -178,7 +179,7 @@ export class IntakesService {
       include: {
         user_supplement: {
           include: {
-            supplement_database: true,
+            supplement_database: { select: CATALOG_PUBLIC },
           },
         },
       },
@@ -204,7 +205,7 @@ export class IntakesService {
       include: {
         user_supplement: {
           include: {
-            supplement_database: true,
+            supplement_database: { select: CATALOG_PUBLIC },
           },
         },
       },
@@ -226,7 +227,7 @@ export class IntakesService {
         active: true,
       },
       include: {
-        supplement_database: true,
+        supplement_database: { select: CATALOG_PUBLIC },
         intakes: {
           where: {
             taken_at: {
@@ -281,7 +282,7 @@ export class IntakesService {
     const supplement = await this.prisma.user_supplement.findUnique({
       where: { id: supplementId },
       include: {
-        supplement_database: true,
+        supplement_database: { select: CATALOG_PUBLIC },
       },
     });
 
