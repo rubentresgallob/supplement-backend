@@ -17,13 +17,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ProGuard } from '../subscription/pro.guard';
+import { ProEnabledGuard, ProGuard } from '../subscription/pro.guard';
 import { StreaksModule } from '../streaks/streaks.module';
 import { StatsService } from './stats.service';
 
 @ApiTags('Stats (Pro)')
 @Controller('stats')
-@UseGuards(JwtAuthGuard, ProGuard)
+@UseGuards(ProEnabledGuard, JwtAuthGuard, ProGuard) // con Pro apagado: 404 antes que 401
 @ApiBearerAuth()
 class StatsController {
   constructor(private readonly statsService: StatsService) {}

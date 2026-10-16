@@ -11,8 +11,9 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Demo web (carpeta public/ en la raíz del proyecto, tanto en local como en Render)
-  app.useStaticAssets(join(process.cwd(), 'public'));
+  // Textos legales en /privacidad y /terminos (copia de docs/legal de la app) y
+  // la página pública de eliminación de cuenta en /eliminar-cuenta.html
+  app.useStaticAssets(join(process.cwd(), 'public'), { extensions: ['html'] });
 
   // La app móvil no necesita CORS; esto es solo para webs en otros dominios.
   // Orígenes extra separados por comas en la variable CORS_ORIGINS.
