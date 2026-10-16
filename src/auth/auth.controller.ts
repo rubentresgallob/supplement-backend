@@ -12,7 +12,7 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { DeleteAccountDto } from './dto/delete-account.dto';
+import { DeleteAccountDto, DeleteAccountWithPasswordDto } from './dto/delete-account.dto';
 import { LegalAcceptanceDto } from './dto/register.dto';
 import {
   ForgotPasswordDto,
@@ -118,6 +118,15 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Contraseña incorrecta' })
   async deleteAccount(@Request() req, @Body() dto: DeleteAccountDto) {
     return this.authService.deleteAccount(req.user.id, dto.password);
+  }
+
+  @Post('delete-account-with-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
+  @ApiOperation({ summary: 'Eliminar la cuenta sin sesión (página web pública de eliminación)' })
+  @ApiResponse({ status: 400, description: 'Email o contraseña incorrectos' })
+  async deleteAccountWithPassword(@Body() dto: DeleteAccountWithPasswordDto) {
+    return this.authService.deleteAccountWithPassword(dto.email.trim(), dto.password);
   }
 
   @Post('forgot-password')

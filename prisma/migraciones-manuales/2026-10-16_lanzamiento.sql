@@ -8,10 +8,13 @@
 --   npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script
 
 BEGIN;
+BEGIN;
 
 -- AlterTable
 ALTER TABLE "user" ADD COLUMN     "age_confirmed_at" TIMESTAMP(3),
 ADD COLUMN     "health_consent_at" TIMESTAMP(3),
+ADD COLUMN     "inactivity_warned_at" TIMESTAMP(3),
+ADD COLUMN     "last_login_at" TIMESTAMP(3),
 ADD COLUMN     "privacy_accepted_at" TIMESTAMP(3),
 ADD COLUMN     "privacy_version" TEXT,
 ADD COLUMN     "share_progress" BOOLEAN NOT NULL DEFAULT false,

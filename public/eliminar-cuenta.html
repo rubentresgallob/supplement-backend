@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eliminar cuenta - Suplementos Tracker</title>
+    <title>Eliminar cuenta - Supplement Tracker</title>
     <link rel="stylesheet" href="/css/styles.css">
     <style>
         .warning { background: #fff4e5; color: #8a4b00; padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.45; margin-bottom: 16px; }
@@ -12,26 +12,28 @@
         .result.ok { color: #15803d; }
         .result.err { color: #b91c1c; }
         ul { margin: 8px 0 0 18px; }
+        .links { margin-top: 18px; font-size: 13px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="auth-container">
             <div class="logo">
-                <div class="logo-icon">💊</div>
-                <h1>Suplementos Tracker</h1>
+                <h1>Supplement Tracker</h1>
                 <p class="subtitle">Eliminar mi cuenta</p>
             </div>
 
             <div class="auth-form">
+                <p>Puedes eliminar tu cuenta sin abrir la app. Escribe el email y la contraseña de tu cuenta.</p>
                 <div class="warning">
-                    <strong>Esta acción no se puede deshacer.</strong> Se borrarán para siempre:
+                    <strong>Esta acción no se puede deshacer.</strong> Se borrarán al momento y para siempre:
                     <ul>
-                        <li>Tu cuenta y tu perfil</li>
-                        <li>Tus suplementos, tomas, rachas y estadísticas</li>
-                        <li>Tus amigos, puntos y objetos de la tienda</li>
+                        <li>Tu cuenta, tu perfil y tus consentimientos</li>
+                        <li>Tus suplementos, tomas, calendario y rachas</li>
+                        <li>Tus amistades, solicitudes, bloqueos y las denuncias que hayas hecho</li>
+                        <li>Tus puntos, su historial y tus objetos</li>
                     </ul>
-                    <p style="margin-top:8px">Si tienes una suscripción Pro, cancélala también desde la App Store o Google Play: borrar la cuenta no la cancela.</p>
+                    <p style="margin-top:8px">Las denuncias que otras personas hayan hecho sobre ti se quedan sin ningún vínculo con tu cuenta.</p>
                 </div>
 
                 <form id="deleteForm">
@@ -49,6 +51,10 @@
                     <button type="submit" class="btn btn-danger" id="submitBtn">Eliminar mi cuenta</button>
                 </form>
                 <p id="result" class="result" role="status"></p>
+                <p class="links">
+                    ¿Has olvidado la contraseña? Recupérala desde la app («¿Olvidaste tu contraseña?») o
+                    escríbenos al email de contacto de la <a href="/privacidad">Política de privacidad</a>.
+                </p>
             </div>
         </div>
     </div>
@@ -70,25 +76,16 @@
             btn.disabled = true;
             show('Eliminando...', true);
             try {
-                const login = await fetch('/auth/login', {
+                // Sin iniciar sesión: el servidor comprueba email y contraseña y borra la cuenta
+                const del = await fetch('/auth/delete-account-with-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password }),
                 });
-                if (!login.ok) throw new Error('Email o contraseña incorrectos.');
-                const { access_token } = await login.json();
-
-                const del = await fetch('/auth/delete-account', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: 'Bearer ' + access_token,
-                    },
-                    body: JSON.stringify({ password }),
-                });
-                if (!del.ok) throw new Error('No se pudo eliminar la cuenta. Inténtalo más tarde.');
+                if (del.status === 429) throw new Error('Demasiados intentos. Espera un poco y vuelve a probar.');
+                if (!del.ok) throw new Error('Email o contraseña incorrectos.');
                 form.remove();
-                show('✅ Tu cuenta y todos tus datos se han eliminado.', true);
+                show('Tu cuenta y todos tus datos se han eliminado.', true);
             } catch (err) {
                 show(err.message, false);
                 btn.disabled = false;

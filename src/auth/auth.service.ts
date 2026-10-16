@@ -12,11 +12,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { randomInt } from 'crypto';
-import { addMinutes, addMonths, startOfMonth, subHours, subSeconds } from 'date-fns';
+import { addMinutes, addMonths, startOfMonth, subDays, subHours, subSeconds } from 'date-fns';
 import { MailService } from '../mail/mail.service';
 import { isProEnabled } from '../subscription/pro-plan';
 import { acceptanceData, legalStatus } from '../legal/legal';
 import { checkUsername, USERNAME_NOT_ALLOWED } from '../moderation/username-filter';
+import { UNVERIFIED_TTL_HOURS } from '../retention/retention.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { StreaksService } from '../streaks/streaks.service';
 
@@ -31,7 +32,6 @@ export const RESET_MAX_ATTEMPTS = 5;
 export const VERIFY_CODE_MINUTES = 30;
 export const VERIFY_MAX_ATTEMPTS = 5;
 export const VERIFY_RESEND_SECONDS = 60; // no se envía otro código antes de esto
-export const UNVERIFIED_TTL_HOURS = 24; // las cuentas sin verificar se borran pasado este tiempo
 
 /** ¿Se puede enviar ya otro código de verificación? */
 export function canResendVerification(sentAt: Date | null, now = new Date()) {
@@ -153,6 +153,7 @@ export class AuthService {
       });
     }
 
+    await this.touchLogin(user.id);
     return this.session(user);
   }
 
@@ -182,6 +183,8 @@ export class AuthService {
         verify_code_hash: null,
         verify_sent_at: null,
         verify_attempts: 0,
+        last_login_at: new Date(),
+        inactivity_warned_at: null,
       },
     });
     this.logger.log(`Email verificado: usuario ${user.id}`);
@@ -285,6 +288,28 @@ export class AuthService {
     };
   }
 
+  /** Último acceso (para la regla de inactividad). Entrar anula un aviso pendiente. */
+  private async touchLogin(userId: number) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { last_login_at: new Date(), inactivity_warned_at: null },
+    });
+  }
+
+  /**
+   * Borrar la cuenta sin sesión (página web pública de eliminación, que exige
+   * Google Play). Funciona aunque la cuenta no esté verificada o esté suspendida.
+   */
+  async deleteAccountWithPassword(email: string, password: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      throw new BadRequestException('Email o contraseña incorrectos');
+    }
+    await this.prisma.user.delete({ where: { id: user.id } });
+    this.logger.log(`Cuenta eliminada desde la web: usuario ${user.id}`);
+    return { message: 'Cuenta eliminada' };
+  }
+
   /** Reaceptación: guarda las tres aceptaciones con la versión vigente. */
   async acceptLegal(userId: number) {
     const user = await this.prisma.user.update({
@@ -371,6 +396,8 @@ export class AuthService {
         reset_expires: null,
         reset_attempts: 0,
         email_verified: true, // ha recibido el código en su email: queda verificado
+        last_login_at: new Date(),
+        inactivity_warned_at: null,
       },
     });
     this.logger.log(`Contraseña restablecida: usuario ${user.id}`);
@@ -405,6 +432,7 @@ export class AuthService {
             share_progress: true,
             share_supplements: true,
             social_intro_seen_at: true,
+            last_login_at: true,
           },
         }),
         this.prisma.user_supplement.findMany({
@@ -475,6 +503,7 @@ export class AuthService {
         email: user.email,
         username: user.username,
         createdAt: user.created_at,
+        lastLoginAt: user.last_login_at,
         consents: {
           ageConfirmedAt: user.age_confirmed_at,
           terms: { acceptedAt: user.terms_accepted_at, version: user.terms_version },
@@ -552,10 +581,16 @@ export class AuthService {
         privacy_version: true,
         age_confirmed_at: true,
         health_consent_at: true,
+        last_login_at: true,
       },
     });
     if (!user) throw new UnauthorizedException();
-    const { terms_version, privacy_version, age_confirmed_at, health_consent_at, ...rest } = user;
+    // La app pide el perfil al abrirse: cuenta como acceso (como mucho, una vez al día)
+    if (!user.last_login_at || user.last_login_at < subDays(new Date(), 1)) {
+      await this.touchLogin(userId);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { terms_version, privacy_version, age_confirmed_at, health_consent_at, last_login_at, ...rest } = user;
     return {
       ...rest,
       legal: legalStatus({ terms_version, privacy_version, age_confirmed_at, health_consent_at }),

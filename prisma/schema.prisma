@@ -27,6 +27,9 @@ model user {
   // Moderación (scripts/moderar.ts)
   suspended_at        DateTime? // cuenta suspendida: no puede iniciar sesión
   suspension_reason   String?
+  // Conservación (src/retention): 24 meses sin entrar → aviso; 30 días después → borrado
+  last_login_at        DateTime? // último inicio de sesión o apertura de la app con sesión
+  inactivity_warned_at DateTime? // cuándo se le avisó de que se borraría su cuenta
   consent_at       DateTime? // (antiguo) casilla única del registro anterior; ver los campos de abajo
   // RGPD: cada aceptación por separado, con fecha y versión del texto (src/legal/legal.ts)
   age_confirmed_at    DateTime? // "Tengo 18 años o más"

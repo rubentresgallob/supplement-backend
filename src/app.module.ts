@@ -20,6 +20,7 @@ import { StatsModule } from './stats/stats.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { PushModule } from './push/push.module';
 import { SocialModule } from './social/social.module';
+import { RetentionModule } from './retention/retention.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { SocialModule } from './social/social.module';
     StatsModule,
     CalendarModule,
     SocialModule,
+    RetentionModule,
   ],
   controllers: [AppController],
   providers: [
