@@ -3,6 +3,7 @@ import { addDays } from 'date-fns';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   isProActive,
+  isProEnabled,
   isProTestMode,
   PRO_FEATURES,
   PRO_PRICES,
@@ -16,6 +17,7 @@ export class SubscriptionService {
   constructor(private prisma: PrismaService) {}
 
   async isPro(userId: number): Promise<boolean> {
+    if (!isProEnabled()) return false;
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { pro_until: true },

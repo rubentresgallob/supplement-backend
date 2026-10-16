@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RewardsService } from './rewards.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { isProEnabled } from '../subscription/pro-plan';
 import { findShopItem, SHOP_ITEMS } from './shop-catalog';
 
 @Injectable()
@@ -33,10 +34,13 @@ export class ShopService {
     const points = user?.points ?? 0;
     const ownedByCode = new Map(owned.map((i) => [i.item_code, i]));
 
+    // Sin Pro encendido, los objetos Pro no existen para la app
+    const catalog = isProEnabled() ? SHOP_ITEMS : SHOP_ITEMS.filter((i) => !i.proOnly);
+
     return {
       points,
-      isPro,
-      items: SHOP_ITEMS.map((item) => {
+      ...(isProEnabled() ? { isPro } : {}),
+      items: catalog.map((item) => {
         const mine = ownedByCode.get(item.code);
         const quantity = mine?.quantity ?? 0;
         return {
@@ -44,7 +48,7 @@ export class ShopService {
           owned: quantity,
           equipped: mine?.equipped ?? false,
           exclusive: item.price === null,
-          proOnly: item.proOnly ?? false,
+          ...(isProEnabled() ? { proOnly: item.proOnly ?? false } : {}),
           canBuy:
             item.price !== null &&
             (!item.proOnly || isPro) &&
@@ -57,7 +61,9 @@ export class ShopService {
 
   async buy(userId: number, itemCode: string) {
     const item = findShopItem(itemCode);
-    if (!item) throw new NotFoundException('Ese objeto no existe');
+    if (!item || (item.proOnly && !isProEnabled())) {
+      throw new NotFoundException('Ese objeto no existe');
+    }
     if (item.price === null) {
       throw new BadRequestException(
         'Este objeto es exclusivo: se consigue con un logro',

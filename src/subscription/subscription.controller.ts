@@ -16,6 +16,7 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SubscriptionService } from './subscription.service';
+import { ProEnabledGuard } from './pro.guard';
 
 class ActivateTestDto {
   @ApiPropertyOptional({ example: 30, description: 'Días de Pro de prueba' })
@@ -28,7 +29,7 @@ class ActivateTestDto {
 
 @ApiTags('Subscription')
 @Controller('subscription')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ProEnabledGuard, JwtAuthGuard)
 @ApiBearerAuth()
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}

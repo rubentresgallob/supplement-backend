@@ -22,9 +22,9 @@ services:
       # Sin esto Render usa UTC y una toma a las 00:30 contaría como del día anterior.
       - key: TZ
         value: Europe/Madrid
-      # Permite activar Pro sin pagar para probarlo. ⚠️ Poner a "false" al publicar en las tiendas.
-      - key: PRO_TEST_MODE
-        value: "true"
+      # Plan Pro APAGADO: versión gratuita. Sus rutas responden 404 y la tienda no muestra objetos Pro.
+      - key: PRO_ENABLED
+        value: "false"
       # Se pega a mano en el panel de Render (la misma URL de Supabase del .env)
       - key: DATABASE_URL
         sync: false

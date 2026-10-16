@@ -14,6 +14,7 @@ import { LoginDto } from './dto/login.dto';
 import { randomInt } from 'crypto';
 import { addMinutes, subHours, subSeconds } from 'date-fns';
 import { MailService } from '../mail/mail.service';
+import { isProEnabled } from '../subscription/pro-plan';
 
 /** Recuperar contraseña: validez del código y máximo de intentos. */
 export const RESET_CODE_MINUTES = 15;
@@ -381,7 +382,7 @@ export class AuthService {
         acceptedTermsAt: user.consent_at,
         emailVerified: user.email_verified,
         shareWithFriends: user.share_with_friends,
-        pro: { until: user.pro_until, source: user.pro_source },
+        ...(isProEnabled() ? { pro: { until: user.pro_until, source: user.pro_source } } : {}),
       },
       supplements: supplements.map((s) => ({
         name: names.get(s.id),
@@ -392,7 +393,7 @@ export class AuthService {
         schedules: s.schedules,
         addedAt: s.created_at,
         removedAt: s.deleted_at,
-        stockUnits: s.stock_units,
+        ...(isProEnabled() ? { stockUnits: s.stock_units } : {}),
       })),
       intakes: intakes.map((i) => ({
         supplement: names.get(i.user_supplement_id) ?? 'Suplemento',

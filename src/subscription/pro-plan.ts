@@ -22,8 +22,14 @@ export const PRO_FEATURES = [
 /** Multiplicador de puntos diarios y semanales para usuarios Pro. */
 export const PRO_POINTS_MULTIPLIER = 1.5;
 
-/** El modo de prueba permite activar Pro sin pagar. Quitar en Render al publicar. */
-export const isProTestMode = () => process.env.PRO_TEST_MODE === 'true';
+/**
+ * Plan Pro encendido. APAGADO por defecto: la versión gratuita no expone nada de Pro
+ * (endpoints 404, sin objetos Pro en la tienda, sin puntos x1,5 ni protector del mes).
+ */
+export const isProEnabled = () => process.env.PRO_ENABLED === 'true';
+
+/** El modo de prueba permite activar Pro sin pagar (solo si Pro está encendido). */
+export const isProTestMode = () => isProEnabled() && process.env.PRO_TEST_MODE === 'true';
 
 export const isProActive = (proUntil: Date | null | undefined, now = new Date()) =>
   !!proUntil && proUntil > now;
