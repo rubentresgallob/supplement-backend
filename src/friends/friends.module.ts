@@ -9,5 +9,6 @@ import { CalendarModule } from '../calendar/calendar.module';
   imports: [RewardsModule, CalendarModule],
   controllers: [FriendsController],
   providers: [FriendsService, StreaksService],
+  exports: [FriendsService],
 })
 export class FriendsModule {}

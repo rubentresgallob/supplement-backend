@@ -16,6 +16,7 @@ import { addMinutes, addMonths, startOfMonth, subHours, subSeconds } from 'date-
 import { MailService } from '../mail/mail.service';
 import { isProEnabled } from '../subscription/pro-plan';
 import { acceptanceData, legalStatus } from '../legal/legal';
+import { checkUsername, USERNAME_NOT_ALLOWED } from '../moderation/username-filter';
 import { CalendarService } from '../calendar/calendar.service';
 import { StreaksService } from '../streaks/streaks.service';
 
@@ -73,6 +74,8 @@ export class AuthService {
   async register(registerDto: RegisterDto) {
     const { email, password, username } = registerDto;
 
+    if (checkUsername(username)) throw new BadRequestException(USERNAME_NOT_ALLOWED);
+
     await this.purgeUnverified();
 
     const byEmail = await this.prisma.user.findUnique({ where: { email } });
@@ -129,6 +132,15 @@ export class AuthService {
     if (!isPasswordValid) {
       this.logger.warn(`Login failed: invalid password for user ${user.id}`);
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.suspended_at) {
+      // Solo con la contraseña correcta: así no se revela qué cuentas están suspendidas
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'ACCOUNT_SUSPENDED',
+        message: `Tu cuenta está suspendida${user.suspension_reason ? `: ${user.suspension_reason}` : ''}. Si crees que es un error, escríbenos.`,
+      });
     }
 
     if (!user.email_verified) {
@@ -262,7 +274,7 @@ export class AuthService {
 
   private session(user: SessionUser) {
     return {
-      access_token: this.jwtService.sign({ sub: user.id, email: user.email }),
+      access_token: this.jwtService.sign({ sub: user.id }), // sin email en el token
       user: {
         id: user.id,
         email: user.email,
@@ -371,7 +383,7 @@ export class AuthService {
    * los códigos de verificación, y de sus amigos solo el nombre de usuario.
    */
   async exportData(userId: number) {
-    const [user, supplements, intakes, friendships, points, items, freezes, notifications] =
+    const [user, supplements, intakes, friendships, points, items, freezes, notifications, sharingEvents, blocks, reports] =
       await Promise.all([
         this.prisma.user.findUnique({
           where: { id: userId },
@@ -390,7 +402,9 @@ export class AuthService {
             points: true,
             pro_until: true,
             pro_source: true,
-            share_with_friends: true,
+            share_progress: true,
+            share_supplements: true,
+            social_intro_seen_at: true,
           },
         }),
         this.prisma.user_supplement.findMany({
@@ -425,6 +439,19 @@ export class AuthService {
           orderBy: { day: 'asc' },
         }),
         this.prisma.notification_config.findUnique({ where: { user_id: userId } }),
+        this.prisma.sharing_event.findMany({
+          where: { user_id: userId },
+          select: { setting: true, enabled: true, created_at: true },
+          orderBy: { created_at: 'asc' },
+        }),
+        this.prisma.user_block.findMany({
+          where: { blocker_id: userId },
+          select: { created_at: true, blocked: { select: { username: true } } },
+        }),
+        this.prisma.user_report.findMany({
+          where: { reporter_id: userId },
+          select: { reason: true, details: true, status: true, created_at: true, reported: { select: { username: true } } },
+        }),
       ]);
     if (!user) throw new UnauthorizedException();
 
@@ -456,7 +483,6 @@ export class AuthService {
           legacyConsentAt: user.consent_at,
         },
         emailVerified: user.email_verified,
-        shareWithFriends: user.share_with_friends,
         ...(isProEnabled() ? { pro: { until: user.pro_until, source: user.pro_source } } : {}),
       },
       supplements: supplements.map((s) => ({
@@ -492,6 +518,20 @@ export class AuthService {
       })),
       streak,
       calendar,
+      sharingWithFriends: {
+        progress: user.share_progress,
+        supplements: user.share_supplements,
+        privacyScreenSeenAt: user.social_intro_seen_at,
+        history: sharingEvents.map((e) => ({ setting: e.setting, enabled: e.enabled, at: e.created_at })),
+      },
+      blockedUsers: blocks.map((b) => ({ username: b.blocked.username, since: b.created_at })),
+      reportsMade: reports.map((r) => ({
+        username: r.reported?.username ?? null,
+        reason: r.reason,
+        details: r.details,
+        status: r.status,
+        at: r.created_at,
+      })),
       streakProtectedDays: freezes.map((f) => f.day),
       notifications: notifications
         ? { enabled: notifications.global_enabled, config: notifications.supplement_configs }

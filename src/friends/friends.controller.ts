@@ -122,19 +122,19 @@ export class FriendsController {
   }
 
   @Get('sharing')
-  @ApiOperation({ summary: '¿Comparto mi stack y mi calendario con mis amigos?' })
+  @ApiOperation({ summary: 'Mis interruptores: compartir progreso y compartir suplementos' })
   getSharing(@Request() req) {
     return this.friendsService.getSharing(req.user.id);
   }
 
   @Put('sharing')
-  @ApiOperation({ summary: 'Activar o desactivar que mis amigos vean mi stack y mi calendario' })
+  @ApiOperation({ summary: 'Cambiar los interruptores (efecto inmediato; se guarda cada cambio)' })
   setSharing(@Request() req, @Body() dto: SharingDto) {
-    return this.friendsService.setSharing(req.user.id, dto.enabled);
+    return this.friendsService.setSharing(req.user.id, dto);
   }
 
   @Get(':friendId/profile')
-  @ApiOperation({ summary: 'Perfil de un amigo: Capsu, racha y, si lo comparte, su stack de hoy' })
+  @ApiOperation({ summary: 'Perfil de un amigo: siempre su Capsu y mes de alta; progreso y stack si los comparte' })
   @ApiResponse({ status: 403, description: 'No sois amigos' })
   getFriendProfile(@Request() req, @Param('friendId', ParseIntPipe) friendId: number) {
     return this.friendsService.getFriendProfile(req.user.id, friendId);

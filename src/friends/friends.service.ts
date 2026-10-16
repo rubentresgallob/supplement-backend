@@ -12,7 +12,8 @@ import { StreaksService } from '../streaks/streaks.service';
 import { RewardsService } from '../rewards/rewards.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { PushService } from '../push/push.service';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, format } from 'date-fns';
+import { isBlockedEitherWay } from '../social/social.service';
 
 /** Respuesta única al enviar una solicitud (no revela si la cuenta existe). */
 export const FRIEND_REQUEST_GENERIC = 'Si existe una cuenta con ese dato, le llegará tu solicitud';
@@ -39,6 +40,7 @@ export class FriendsService {
     const targetUser = await this.prisma.user.findFirst({
       where: {
         email_verified: true,
+        suspended_at: null,
         OR: [{ email: identifier }, { username: identifier }],
       },
       select: { id: true },
@@ -51,6 +53,12 @@ export class FriendsService {
 
     if (targetUser.id === userId) {
       throw new BadRequestException('No puedes enviarte una solicitud a ti mismo');
+    }
+
+    // Bloqueo en cualquier sentido: no se crea nada, y la respuesta no lo delata
+    if (await isBlockedEitherWay(this.prisma, userId, targetUser.id)) {
+      this.logger.log(`Solicitud de amistad del usuario ${userId}: bloqueada`);
+      return generic;
     }
 
     const existingFriendship = await this.prisma.friendship.findFirst({
@@ -168,6 +176,7 @@ export class FriendsService {
     return { message: 'Friend request rejected' };
   }
 
+  /** Mis amigos: lo que se ve siempre (nombre de usuario, objetos equipados, mes y año de alta). */
   async getFriends(userId: number) {
     const friendships = await this.prisma.friendship.findMany({
       where: {
@@ -175,37 +184,23 @@ export class FriendsService {
         status: 'accepted',
       },
       include: {
-        requester: {
-          select: {
-            id: true,
-            username: true,
-            created_at: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            username: true,
-            created_at: true,
-          },
-        },
+        requester: { select: { id: true, username: true, created_at: true } },
+        receiver: { select: { id: true, username: true, created_at: true } },
       },
     });
+    const friends = friendships.map((f) => ({
+      friendship: f,
+      friend: f.requester_id === userId ? f.receiver : f.requester,
+    }));
+    const equipped = await this.rewardsService.getEquippedFor(friends.map((f) => f.friend.id));
 
-    // Format to return the friend (not the current user)
-    const friends = friendships.map((friendship) => {
-      const friend =
-        friendship.requester_id === userId
-          ? friendship.receiver
-          : friendship.requester;
-      return {
-        friendshipId: friendship.id,
-        friend,
-        friendsSince: friendship.created_at,
-      };
-    });
-
-    return friends;
+    return friends.map(({ friendship, friend }) => ({
+      friendshipId: friendship.id,
+      friend: { id: friend.id, username: friend.username },
+      memberSince: memberSinceMonth(friend.created_at),
+      equipped: equipped.get(friend.id) ?? {},
+      friendsSince: friendship.created_at,
+    }));
   }
 
   async removeFriend(userId: number, friendId: number) {
@@ -241,13 +236,7 @@ export class FriendsService {
         status: 'pending',
       },
       include: {
-        requester: {
-          select: {
-            id: true,
-            username: true,
-            created_at: true,
-          },
-        },
+        requester: { select: { id: true, username: true } },
       },
       orderBy: { created_at: 'desc' },
     });
@@ -259,97 +248,6 @@ export class FriendsService {
     }));
   }
 
-  async getFriendProgress(userId: number, friendId: number) {
-    // Verify friendship
-    const friendship = await this.prisma.friendship.findFirst({
-      where: {
-        OR: [
-          { requester_id: userId, receiver_id: friendId },
-          { requester_id: friendId, receiver_id: userId },
-        ],
-        status: 'accepted',
-      },
-    });
-
-    if (!friendship) {
-      this.logger.warn(
-        `User ${userId} attempted to view progress of non-friend ${friendId}`,
-      );
-      throw new ForbiddenException(
-        'Can only view progress of accepted friends',
-      );
-    }
-
-    // Get friend's basic info
-    const friend = await this.prisma.user.findUnique({
-      where: { id: friendId },
-      select: {
-        id: true,
-        username: true,
-      },
-    });
-
-    if (!friend) {
-      throw new NotFoundException('Friend not found');
-    }
-
-    // Get friend's streak
-    const streak = await this.streaksService.getUserStreak(friendId);
-
-    // Get active supplements count
-    const activeSupplementsCount = await this.prisma.user_supplement.count({
-      where: {
-        user_id: friendId,
-        active: true,
-      },
-    });
-
-    // Calculate adherence for last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const activeSupplements = await this.prisma.user_supplement.findMany({
-      where: {
-        user_id: friendId,
-        active: true,
-      },
-    });
-
-    let totalExpected = 0;
-    let totalTaken = 0;
-
-    for (const supplement of activeSupplements) {
-      const expectedFor30Days = 30 * supplement.times_per_day;
-      totalExpected += expectedFor30Days;
-
-      const intakeCount = await this.prisma.intake.count({
-        where: {
-          user_supplement_id: supplement.id,
-          taken_at: {
-            gte: thirtyDaysAgo,
-          },
-        },
-      });
-
-      totalTaken += intakeCount;
-    }
-
-    const adherencePercent =
-      totalExpected > 0 ? Math.round((totalTaken / totalExpected) * 100) : 0;
-
-    return {
-      user: friend,
-      streak: {
-        current: streak.current_streak,
-        longest: streak.longest_streak,
-      },
-      activeSupplements: activeSupplementsCount,
-      last30DaysAdherence: adherencePercent,
-    };
-  }
-
-  // ── Perfil de un amigo ────────────────────────────────────────────────────
-
   /** Lanza 403 si no son amigos (amistad aceptada). */
   private async assertFriends(userId: number, friendId: number) {
     const friendship = await this.prisma.friendship.findFirst({
@@ -360,50 +258,127 @@ export class FriendsService {
         ],
         status: 'accepted',
       },
+      select: { id: true },
     });
     if (!friendship) {
+      this.logger.warn(`Usuario ${userId} intenta ver a ${friendId}, que no es su amigo`);
       throw new ForbiddenException('Can only view progress of accepted friends');
     }
   }
 
-  /** ¿Deja este usuario que sus amigos vean su stack y su calendario? */
+  /** Racha, cumplimiento de 30 días y nº de suplementos activos de un usuario. */
+  async progressOf(userId: number) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const [streak, activeSupplements] = await Promise.all([
+      this.streaksService.getUserStreak(userId),
+      this.prisma.user_supplement.findMany({
+        where: { user_id: userId, active: true },
+        select: { id: true, times_per_day: true },
+      }),
+    ]);
+    const totalExpected = activeSupplements.reduce((a, s) => a + 30 * s.times_per_day, 0);
+    const totalTaken = activeSupplements.length
+      ? await this.prisma.intake.count({
+          where: {
+            user_supplement_id: { in: activeSupplements.map((s) => s.id) },
+            taken_at: { gte: thirtyDaysAgo },
+          },
+        })
+      : 0;
+    return {
+      streak: { current: streak.current_streak, longest: streak.longest_streak },
+      activeSupplements: activeSupplements.length,
+      last30DaysAdherence:
+        totalExpected > 0 ? Math.min(100, Math.round((totalTaken / totalExpected) * 100)) : 0,
+    };
+  }
+
+  /** Progreso de un amigo: solo si tiene activado "Compartir mi progreso". */
+  async getFriendProgress(userId: number, friendId: number) {
+    await this.assertFriends(userId, friendId);
+    const friend = await this.prisma.user.findUnique({
+      where: { id: friendId },
+      select: { id: true, username: true, share_progress: true },
+    });
+    if (!friend) throw new NotFoundException('Friend not found');
+    if (!friend.share_progress) {
+      throw new ForbiddenException({ message: 'Tu amigo no comparte su progreso', code: 'SHARING_DISABLED' });
+    }
+    return { user: { id: friend.id, username: friend.username }, ...(await this.progressOf(friendId)) };
+  }
+
+  // ── Interruptores de privacidad ───────────────────────────────────────────
+
   async getSharing(userId: number) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { share_with_friends: true },
+      select: { share_progress: true, share_supplements: true, social_intro_seen_at: true },
     });
-    return { enabled: user?.share_with_friends ?? true };
-  }
-
-  async setSharing(userId: number, enabled: boolean) {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { share_with_friends: enabled },
-    });
-    return { enabled };
+    return {
+      progress: user?.share_progress ?? false,
+      supplements: user?.share_supplements ?? false,
+      introSeen: !!user?.social_intro_seen_at,
+    };
   }
 
   /**
-   * Perfil de un amigo: su Capsu (objetos equipados), racha y cumplimiento.
-   * Su stack y lo que ha tomado hoy solo van si él lo comparte (`sharing`).
+   * Cambia los interruptores (efecto inmediato en la API) y guarda cada
+   * activación y desactivación en sharing_event.
+   */
+  async setSharing(userId: number, changes: { progress?: boolean; supplements?: boolean; introSeen?: boolean }) {
+    const current = await this.getSharing(userId);
+    const events: { user_id: number; setting: string; enabled: boolean }[] = [];
+    if (changes.progress !== undefined && changes.progress !== current.progress) {
+      events.push({ user_id: userId, setting: 'progress', enabled: changes.progress });
+    }
+    if (changes.supplements !== undefined && changes.supplements !== current.supplements) {
+      events.push({ user_id: userId, setting: 'supplements', enabled: changes.supplements });
+    }
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(changes.progress !== undefined ? { share_progress: changes.progress } : {}),
+          ...(changes.supplements !== undefined ? { share_supplements: changes.supplements } : {}),
+          ...(changes.introSeen && !current.introSeen ? { social_intro_seen_at: new Date() } : {}),
+        },
+      }),
+      this.prisma.sharing_event.createMany({ data: events }),
+    ]);
+    return this.getSharing(userId);
+  }
+
+  /**
+   * Perfil de un amigo. Siempre: nombre de usuario, objetos equipados y mes de alta.
+   * Con "Compartir mi progreso": racha, % de 30 días y nº de suplementos.
+   * Con "Compartir mis suplementos": stack de hoy (nombre, dosis, forma, tomas).
    */
   async getFriendProfile(userId: number, friendId: number) {
-    const progress = await this.getFriendProgress(userId, friendId); // comprueba la amistad
+    await this.assertFriends(userId, friendId);
     const [friend, equipped] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: friendId },
-        select: { share_with_friends: true, created_at: true },
+        select: {
+          id: true,
+          username: true,
+          created_at: true,
+          share_progress: true,
+          share_supplements: true,
+        },
       }),
       this.rewardsService.getEquippedFor([friendId]),
     ]);
-    const sharing = friend?.share_with_friends ?? true;
+    if (!friend) throw new NotFoundException('Friend not found');
 
     return {
-      ...progress,
-      memberSince: friend?.created_at ?? null,
+      user: { id: friend.id, username: friend.username },
+      memberSince: memberSinceMonth(friend.created_at),
       equipped: equipped.get(friendId) ?? {},
-      sharing,
-      today: sharing ? await this.todayOf(friendId) : null,
+      sharesProgress: friend.share_progress,
+      sharesSupplements: friend.share_supplements,
+      progress: friend.share_progress ? await this.progressOf(friendId) : null,
+      today: friend.share_supplements ? await this.todayOf(friendId) : null,
     };
   }
 
@@ -435,11 +410,14 @@ export class FriendsService {
     return { supplements: list, taken, expected, complete: expected > 0 && taken >= expected };
   }
 
-  /** Calendario mensual de un amigo (solo si lo comparte). */
+  /** Calendario mensual de un amigo (solo con "Compartir mis suplementos"). */
   async getFriendCalendar(userId: number, friendId: number, year: number, month: number) {
     await this.assertFriends(userId, friendId);
-    const { enabled } = await this.getSharing(friendId);
-    if (!enabled) {
+    const friend = await this.prisma.user.findUnique({
+      where: { id: friendId },
+      select: { share_supplements: true },
+    });
+    if (!friend?.share_supplements) {
       throw new ForbiddenException({
         message: 'Tu amigo no comparte su calendario',
         code: 'SHARING_DISABLED',
@@ -508,4 +486,9 @@ export function motivationMessage(sender: string, pendingSupplement: string | nu
     body: dayComplete ? 'Hoy ya lo tienes todo. ¡Sigue así!' : '¡A por el día de hoy!',
     data: { type: 'motivation' },
   };
+}
+
+/** Mes y año de alta ("2026-10"): a los amigos no se les da la fecha exacta. */
+export function memberSinceMonth(createdAt: Date) {
+  return format(createdAt, 'yyyy-MM');
 }

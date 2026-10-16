@@ -27,8 +27,12 @@ export class LeaderboardService {
       f.requester_id === userId ? f.receiver_id : f.requester_id,
     );
 
-    // Include current user
-    const allUserIds = [userId, ...friendIds];
+    // Solo aparece quien tiene activado "Compartir mi progreso" (también uno mismo)
+    const sharing = await this.prisma.user.findMany({
+      where: { id: { in: [userId, ...friendIds] }, share_progress: true, suspended_at: null },
+      select: { id: true },
+    });
+    const allUserIds = sharing.map((u) => u.id);
 
     // Medalla, banner y accesorios de Capsu que lleva cada uno
     const equipped = await this.rewardsService.getEquippedFor(allUserIds);
@@ -75,6 +79,7 @@ export class LeaderboardService {
     return {
       leaderboard: rankedLeaderboard,
       totalUsers: rankedLeaderboard.length,
+      meSharing: allUserIds.includes(userId),
     };
   }
 
@@ -92,8 +97,12 @@ export class LeaderboardService {
       f.requester_id === userId ? f.receiver_id : f.requester_id,
     );
 
-    // Include current user
-    const allUserIds = [userId, ...friendIds];
+    // Solo aparece quien tiene activado "Compartir mi progreso" (también uno mismo)
+    const sharing = await this.prisma.user.findMany({
+      where: { id: { in: [userId, ...friendIds] }, share_progress: true, suspended_at: null },
+      select: { id: true },
+    });
+    const allUserIds = sharing.map((u) => u.id);
 
     // Calculate adherence for each user
     const thirtyDaysAgo = new Date();
@@ -166,6 +175,7 @@ export class LeaderboardService {
       leaderboard: rankedLeaderboard,
       totalUsers: rankedLeaderboard.length,
       period: 'Last 30 days',
+      meSharing: allUserIds.includes(userId),
     };
   }
 }

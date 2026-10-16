@@ -19,6 +19,7 @@ import { MailModule } from './mail/mail.service';
 import { StatsModule } from './stats/stats.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { PushModule } from './push/push.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PushModule } from './push/push.module';
     RewardsModule,
     StatsModule,
     CalendarModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [

@@ -19,7 +19,14 @@ model user {
   reset_code_hash  String? // Recuperar contraseña: código de 6 cifras (hasheado)
   reset_expires    DateTime?
   reset_attempts   Int       @default(0)
-  share_with_friends Boolean @default(true) // Sus amigos ven su stack, lo que toma hoy y su calendario
+  share_with_friends Boolean @default(true) // (antiguo, ya no se usa) sustituido por share_progress y share_supplements
+  // Privacidad por defecto (art. 25 RGPD): los dos interruptores empiezan apagados
+  share_progress      Boolean   @default(false) // racha, % de 30 días, nº de suplementos y aparecer en la clasificación
+  share_supplements   Boolean   @default(false) // nombre, dosis y forma de cada suplemento, tomas de hoy y calendario
+  social_intro_seen_at DateTime? // vio la pantalla que explica qué ven sus amigos (1.ª solicitud)
+  // Moderación (scripts/moderar.ts)
+  suspended_at        DateTime? // cuenta suspendida: no puede iniciar sesión
+  suspension_reason   String?
   consent_at       DateTime? // (antiguo) casilla única del registro anterior; ver los campos de abajo
   // RGPD: cada aceptación por separado, con fecha y versión del texto (src/legal/legal.ts)
   age_confirmed_at    DateTime? // "Tengo 18 años o más"
@@ -46,6 +53,11 @@ model user {
   push_tokens           push_token[]
   motivations_sent      motivation[]         @relation("MotivationSender")
   motivations_received  motivation[]         @relation("MotivationReceiver")
+  sharing_events        sharing_event[]
+  blocks_made           user_block[]         @relation("Blocker")
+  blocks_received       user_block[]         @relation("Blocked")
+  reports_made          user_report[]        @relation("Reporter")
+  reports_received      user_report[]        @relation("Reported")
 }
 
 model supplement_database {
@@ -201,4 +213,50 @@ model motivation {
   receiver user @relation("MotivationReceiver", fields: [receiver_id], references: [id], onDelete: Cascade)
 
   @@index([sender_id, receiver_id, created_at])
+}
+
+// Historial de los interruptores de privacidad: cuándo se activó o desactivó cada uno
+model sharing_event {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  setting    String // progress · supplements
+  enabled    Boolean
+  created_at DateTime @default(now())
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+// Bloqueos: se borra la amistad, no puede volver a enviar solicitudes y no se ven los perfiles
+model user_block {
+  id         Int      @id @default(autoincrement())
+  blocker_id Int
+  blocked_id Int
+  created_at DateTime @default(now())
+
+  blocker user @relation("Blocker", fields: [blocker_id], references: [id], onDelete: Cascade)
+  blocked user @relation("Blocked", fields: [blocked_id], references: [id], onDelete: Cascade)
+
+  @@unique([blocker_id, blocked_id])
+  @@index([blocked_id])
+}
+
+// Denuncias (norma 1.2 de Apple / UGC de Google Play). Si el denunciante borra su cuenta,
+// se borran sus denuncias; si la borra el denunciado, la denuncia queda anónima (reported_id = null).
+model user_report {
+  id          Int      @id @default(autoincrement())
+  reporter_id Int
+  reported_id Int?
+  reason      String // offensive_name · impersonation · harassment · other
+  details     String?
+  status      String   @default("open") // open · closed
+  created_at  DateTime @default(now())
+
+  reporter user  @relation("Reporter", fields: [reporter_id], references: [id], onDelete: Cascade)
+  reported user? @relation("Reported", fields: [reported_id], references: [id], onDelete: SetNull)
+
+  @@index([reporter_id])
+  @@index([reported_id])
+  @@index([status])
 }

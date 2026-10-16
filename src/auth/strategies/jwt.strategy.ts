@@ -1,10 +1,11 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -12,7 +13,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  /** Una cuenta borrada o suspendida deja de valer aunque su token no haya caducado. */
   async validate(payload: any) {
-    return { id: payload.sub, email: payload.email };
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, suspended_at: true },
+    });
+    if (!user || user.suspended_at) throw new UnauthorizedException();
+    return { id: user.id };
   }
 }
