@@ -68,6 +68,11 @@ Render (Blueprint en `render.yaml`): cada push a `main` compila, aplica las migr
 secretas (`DATABASE_URL`, `BREVO_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`…) se ponen en el panel de Render, nunca en el
 repositorio. `JWT_SECRET` la genera Render.
 
+## Cómo se ha desarrollado
+
+Con Claude Code como asistente. Las reglas de trabajo y el registro de cada cambio (qué se pidió, qué se decidió y
+cómo se verificó) están en [docs/CLAUDE.md](docs/CLAUDE.md).
+
 ## Licencia
 
 © 2026 rubentresgallob. Todos los derechos reservados. El código se publica solo para que se pueda consultar;
