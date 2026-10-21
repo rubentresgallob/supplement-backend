@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { getJwtSecret } from './jwt-secret';
 import { LocalStrategy } from './strategies/local.strategy';
 import { CalendarModule } from '../calendar/calendar.module';
 import { StreaksModule } from '../streaks/streaks.module';
@@ -13,9 +14,11 @@ import { StreaksModule } from '../streaks/streaks.module';
     PassportModule,
     CalendarModule, // para "Descargar mis datos"
     StreaksModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '30d' },
+    JwtModule.registerAsync({
+      useFactory: () => ({
+        secret: getJwtSecret(),
+        signOptions: { expiresIn: '30d' },
+      }),
     }),
   ],
   controllers: [AuthController],

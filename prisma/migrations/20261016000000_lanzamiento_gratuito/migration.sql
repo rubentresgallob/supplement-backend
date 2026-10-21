@@ -1,12 +1,7 @@
--- Migración del lanzamiento gratuito (rama lanzamiento-gratuito). NO ejecutada.
--- Solo AÑADE columnas y tablas: no borra ni cambia datos.
--- Los usuarios que ya existen quedan con share_progress = false y share_supplements = false
--- (privacidad por defecto) y sin versiones aceptadas (verán la pantalla de reaceptación).
--- Ejecutar (desde nodejs_space, con la DATABASE_URL de producción en .env):
---   npx prisma db execute --file prisma/migraciones-manuales/2026-10-16_lanzamiento.sql --schema prisma/schema.prisma
--- Comprobar después que no queda nada pendiente:
---   npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script
-
+-- Lanzamiento gratuito: consentimientos, privacidad entre amigos, bloquear/denunciar y conservación de datos.
+-- Solo AÑADE columnas y tablas: no borra ni cambia datos. Los usuarios existentes quedan con
+-- share_progress/share_supplements = false (privacidad por defecto) y verán la pantalla de reaceptación.
+-- En una transacción: si algo falla, no se aplica nada.
 BEGIN;
 
 -- AlterTable

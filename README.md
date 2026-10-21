@@ -1,157 +1,72 @@
-# Supplement Tracking Backend API
+# Supplement Tracker — Backend
 
-API completa en NestJS para el seguimiento de suplementos y gestión de usuarios.
+API de **Supplement Tracker**, una app para llevar el control de los suplementos que tomas: registro de tomas,
+rachas, calendario, amigos y una tienda de recompensas. La app móvil (Flutter) es un repositorio aparte.
 
-## Características
+**Stack:** NestJS 11 · TypeScript · PostgreSQL (Supabase) · Prisma 5 · JWT · Jest · Render
 
-- **Autenticación JWT**: Registro, login y gestión de perfiles de usuario
-- **Base de datos de suplementos**: 30 suplementos precargados con información detallada
-- **Suplementos personalizados**: Los usuarios pueden añadir suplementos de la base de datos o crear sus propios suplementos personalizados
-- **Registro de tomas**: Seguimiento de cuándo se toman los suplementos
-- **Sistema de rachas**: Cálculo automático de días consecutivos cumpliendo la rutina
-- **Sistema social**: Añadir amigos, ver su progreso y competir en rankings
-- **Leaderboards**: Clasificaciones por racha y adherencia entre amigos
-- **Configuración de notificaciones**: Preferencias de recordatorios
+## Arquitectura
 
-## Requisitos Previos
+Monolito modular: cada carpeta de `src/` es un módulo de NestJS con su controlador y su servicio, que hablan con la
+base de datos a través de un `PrismaService` global.
 
-- Node.js 18+
-- PostgreSQL
-- Yarn
+| Módulo | Qué hace |
+|---|---|
+| `auth` | Registro con verificación por email, login, recuperar contraseña, exportar datos, borrar cuenta |
+| `supplements`, `user-supplements` | Catálogo y el stack de cada usuario (al quitar uno se retira, no se borra su historial) |
+| `intakes`, `streaks`, `calendar`, `stats` | Tomas (máx. 48 h atrás, se pueden deshacer), rachas, calendario mensual |
+| `rewards` | Puntos, logros, objetivos semanales y tienda (premios idempotentes por `ref` única) |
+| `friends`, `leaderboard`, `social`, `push` | Amigos, ranking, privacidad, bloquear/denunciar, push con FCM |
+| `retention` | Borrado de cuentas sin verificar e inactivas (RGPD) |
+| `subscription` | Plan Pro, apagado con `PRO_ENABLED=false` |
 
-## Instalación
+Lo transversal está en `src/common/`: límite de peticiones por IP real (`CF-Connecting-IP`) y logs sin datos personales.
+La documentación de todos los endpoints está en Swagger: `http://localhost:3000/api`.
 
-```bash
-# Clonar el repositorio
-cd /home/ubuntu/supplement_backend/nodejs_space
+## Puesta en marcha
 
-# Instalar dependencias
-yarn install
-
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales
-```
-
-## Variables de Entorno
-
-Edita el archivo `.env`:
-
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/supplement_db"
-JWT_SECRET="your-super-secret-jwt-key"
-PORT=3000
-```
-
-## Base de Datos
+Requisitos: Node.js 22 y PostgreSQL.
 
 ```bash
-# Generar cliente Prisma
-yarn prisma generate
-
-# Sincronizar schema con la base de datos
-yarn prisma db push
-
-# Cargar datos iniciales (30 suplementos)
-yarn ts-node prisma/seed.ts
+npm ci
+cp .env.example .env      # rellena DATABASE_URL y JWT_SECRET
+npm run db:deploy         # aplica las migraciones
+npx prisma db seed        # carga el catálogo de suplementos
+npm run start:dev
 ```
 
-## Ejecutar
+## Migraciones
+
+El esquema se cambia **solo con migraciones versionadas** en `prisma/migrations/` (nada de `prisma db push`).
 
 ```bash
-# Desarrollo
-yarn start:dev
-
-# Producción
-yarn build
-yarn start:prod
+# 1. Edita prisma/schema.prisma
+# 2. Genera la migración contra tu base de datos LOCAL y revisa el SQL antes de subirlo
+npm run db:migrate -- --name descripcion_del_cambio
+# 3. En producción se aplica sola al desplegar (render.yaml: prisma migrate deploy)
+npm run db:status         # qué migraciones faltan por aplicar
 ```
 
-## Documentación API
+Reglas para que sean seguras:
 
-Una vez ejecutando el servidor, la documentación Swagger estará disponible en:
+- **Solo añadir** en una migración (columnas con valor por defecto o que admitan nulos, tablas nuevas). Renombrar o
+  borrar se hace en dos despliegues: primero el código deja de usarlo y después se quita de la base de datos.
+- Cada migración va en una transacción: si falla, no se aplica nada.
+- Se despliega solo si el código compila, y si una migración falla, Render mantiene la versión anterior.
+- El CI aplica todas las migraciones sobre una base de datos vacía y comprueba que coinciden con `schema.prisma`.
+- `0_init` es la línea base: el estado de producción cuando se pasó de `db push` a migraciones.
 
-**http://localhost:3000/api**
+## Tests
 
-## Endpoints Principales
-
-### Autenticación
-- `POST /auth/register` - Registrar nuevo usuario
-- `POST /auth/login` - Iniciar sesión
-- `GET /auth/profile` - Obtener perfil del usuario
-
-### Suplementos Pre-cargados
-- `GET /supplements/database` - Listar todos los suplementos (paginado)
-- `GET /supplements/database/:id` - Detalle de un suplemento
-- `GET /supplements/database/search?q=query` - Buscar suplementos
-
-### Suplementos del Usuario
-- `POST /user-supplements` - Crear suplemento
-- `GET /user-supplements` - Listar suplementos del usuario
-- `GET /user-supplements/:id` - Detalle de suplemento
-- `PUT /user-supplements/:id` - Actualizar suplemento
-- `DELETE /user-supplements/:id` - Eliminar suplemento
-
-### Registro de Tomas
-- `POST /intakes` - Registrar toma
-- `GET /intakes` - Historial de tomas
-- `GET /intakes/today` - Tomas de hoy
-- `GET /intakes/progress/today` - Progreso diario
-- `GET /intakes/stats/:supplementId` - Estadísticas por suplemento
-
-### Rachas
-- `GET /streaks/user` - Racha global del usuario
-- `GET /streaks/supplement/:id` - Racha por suplemento
-
-### Amigos
-- `POST /friends/request` - Enviar solicitud de amistad
-- `POST /friends/accept/:requestId` - Aceptar solicitud
-- `POST /friends/reject/:requestId` - Rechazar solicitud
-- `GET /friends` - Lista de amigos
-- `DELETE /friends/:friendId` - Eliminar amistad
-- `GET /friends/requests` - Solicitudes pendientes
-- `GET /friends/:friendId/progress` - Ver progreso del amigo
-
-### Leaderboards
-- `GET /leaderboard/friends` - Ranking por racha
-- `GET /leaderboard/adherence` - Ranking por adherencia
-
-### Notificaciones
-- `GET /notifications/config` - Obtener configuración
-- `PUT /notifications/config` - Actualizar configuración
-
-## Estructura del Proyecto
-
-```
-src/
-├── auth/                 # Autenticación y JWT
-├── supplements/          # Suplementos pre-cargados
-├── user-supplements/     # Suplementos del usuario
-├── intakes/              # Registro de tomas
-├── streaks/              # Sistema de rachas
-├── friends/              # Sistema social
-├── leaderboard/          # Rankings
-├── notifications/        # Configuración de notificaciones
-├── prisma/               # Servicio Prisma
-├── app.module.ts        # Módulo principal
-└── main.ts              # Punto de entrada
-
-prisma/
-├── schema.prisma         # Schema de base de datos
-├── seed.ts              # Script de carga inicial
-└── supplements_database.json  # Datos de suplementos
+```bash
+npm test
 ```
 
-## Tecnologías
+## Despliegue
 
-- **NestJS** - Framework backend
-- **TypeScript** - Lenguaje tipado
-- **Prisma** - ORM
-- **PostgreSQL** - Base de datos
-- **JWT** - Autenticación
-- **Bcrypt** - Hash de contraseñas
-- **Swagger** - Documentación API
-- **class-validator** - Validación de DTOs
+Render (Blueprint en `render.yaml`): cada push a `main` compila, aplica las migraciones y despliega. Las variables
+secretas (`DATABASE_URL`, `BREVO_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`…) se ponen en el panel de Render, nunca en el
+repositorio. `JWT_SECRET` la genera Render.
 
 ## Licencia
 
