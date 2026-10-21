@@ -70,4 +70,5 @@ repositorio. `JWT_SECRET` la genera Render.
 
 ## Licencia
 
-MIT
+© 2026 rubentresgallob. Todos los derechos reservados. El código se publica solo para que se pueda consultar;
+no se concede permiso para copiarlo, modificarlo, distribuirlo ni usarlo. Ver [LICENSE](LICENSE).
